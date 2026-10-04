@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "linear-todo-with-skills": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    }
+  }
+}
