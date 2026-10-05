@@ -9,7 +9,19 @@ Specs and tickets for this repo live in Linear, team **Todo-with-skills**. Use t
 - A **ticket** is a Linear **Issue** in that project. Tickets are never sub-issues of anything; their task graph is expressed only through `blockedBy` relations.
 - Issues not tied to a spec (bugs, triage) are plain issues with no project.
 
-Example: project `P-TOD-1` "Personal Lists and Todos (v1)" → document "Spec" → issues TOD-6 … TOD-17.
+Example: project `P-TOD-2` "Foundation" → document "Spec" → issues TOD-6, TOD-7, TOD-8.
+
+Several specs may share one larger design: then one project's Spec document is the **shared spec** (holding the common implementation and testing decisions), and the other projects' Spec documents list their own user stories and point to it. Example: "Lists and Todos v1a: Core" holds the shared v1 spec; v1b Editing and v1c Ordering point to it.
+
+## Spec size
+
+A spec lands as one pull request, so its size is the size of the review. Keep each spec to:
+
+- a PR a human can review in 30–60 minutes (code, preview, clicking through the feature);
+- 2–4 agent tickets (`ready-for-agent`); `ready-for-human` tickets don't count;
+- one outcome that can be demonstrated on its own once merged.
+
+When a plan is bigger, split it into several specs in dependency order (each its own Project), rather than one large spec. Generated files, lockfiles and pure reformat commits don't count toward the review size.
 
 ## Specs (Projects)
 
