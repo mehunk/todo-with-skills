@@ -14,6 +14,13 @@ const NEXT_MODE: Record<ThemeMode, ThemeMode> = {
   auto: "light",
 };
 
+/** How each mode is named to the user. */
+const LABEL: Record<ThemeMode, string> = {
+  light: "light",
+  dark: "dark",
+  auto: "system",
+};
+
 const ICON: Record<ThemeMode, typeof SunIcon> = {
   light: SunIcon,
   dark: MoonIcon,
@@ -45,10 +52,7 @@ export default function ThemeToggle() {
     storeThemeMode(next);
   }
 
-  const label =
-    mode === "auto"
-      ? "Theme: system. Switch to light"
-      : `Theme: ${mode}. Switch to ${NEXT_MODE[mode] === "auto" ? "system" : NEXT_MODE[mode]}`;
+  const label = `Theme: ${LABEL[mode]}. Switch to ${LABEL[NEXT_MODE[mode]]}`;
   const Icon = ICON[mode];
 
   return (
