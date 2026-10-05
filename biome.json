@@ -15,6 +15,8 @@
       "**/vite.config.ts",
       "**/vitest.config.ts",
       "**/drizzle.config.ts",
+      "**/playwright.config.ts",
+      "**/e2e/**/*",
       "**/.storybook/**/*",
       "!**/src/routeTree.gen.ts",
       "!**/src/styles.css"

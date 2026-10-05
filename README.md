@@ -62,6 +62,41 @@ npm run test:watch  # watch mode
 
 Vitest runs tests inside the Workers runtime (`@cloudflare/vitest-pool-workers`, configured in `vitest.config.ts`) against a real local D1. Every test file gets its own fresh database with all migrations applied, and after each test every row is deleted and AUTOINCREMENT counters are reset, so no test sees another's rows or inherits its ids (schema created in a file, e.g. in `beforeAll`, does persist across that file's tests). Seed data in `beforeEach` or the test itself, not `beforeAll`. The Todos module (`src/todos`) is the test seam for product behaviour; see `src/todos/todos.test.ts` for the pattern.
 
+## End-to-end tests
+
+```bash
+npx playwright install chromium   # once
+npm run e2e                       # against a dev server it starts on :3100
+BASE_URL=https://pr-12-todo-preview.personal-d9e.workers.dev npm run e2e
+npm run e2e:report                # open the last HTML report
+```
+
+Playwright (`playwright.config.ts`, specs in `e2e/`) drives Chromium. Without `BASE_URL` it starts `vite dev` on port 3100 (reusing one already there, outside CI); with `BASE_URL` it tests that deployment and starts nothing.
+
+Environment, read from `.env.local` locally (real environment variables win; `E2E_ENV_FILE` points at another file, e.g. the main checkout's from a git worktree):
+
+- `CLERK_PUBLISHABLE_KEY` (falls back to `VITE_CLERK_PUBLISHABLE_KEY`) and `CLERK_SECRET_KEY`: the Clerk development instance.
+- `E2E_CLERK_USER_EMAIL`: the dedicated E2E test user. It must exist in that Clerk instance.
+
+Global setup (`e2e/global.setup.ts`) calls `clerkSetup()` from `@clerk/testing` once for a Testing Token. On failure, the HTML report (`playwright-report/`), traces, and screenshots (`test-results/`) are kept for CI to upload.
+
+### Conventions for feature tests
+
+- Import `test` and `expect` from `e2e/support/fixtures`, not from `@playwright/test`.
+- Sign in with `signIn(page)` from `e2e/support/auth` after `page.goto("/")`. It signs in as the E2E user with a Clerk sign-in token (no password, no UI).
+- Tests run in parallel as the same user, sometimes against a shared deployment. Never assume an empty account and never depend on another test's data. Name everything a test creates with `testData.uniqueName("Groceries")` and assert on that name. Right after creating it, register how to delete it with `testData.onCleanup(...)`. Cleanup runs after the test, pass or fail, newest first:
+
+  ```ts
+  test("an Owner can rename a List", async ({ page, testData }) => {
+    await page.goto("/");
+    await signIn(page);
+    const name = testData.uniqueName("Groceries");
+    await createList(page, name); // through the UI
+    testData.onCleanup(() => deleteList(page, name));
+    // ...
+  });
+  ```
+
 
 ## Deploy to Cloudflare Workers
 
