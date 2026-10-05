@@ -135,6 +135,27 @@ npx wrangler triggers deploy --env preview --config wrangler.jsonc # turn on wor
 
 A Worker created by `secret put` starts with its workers.dev and preview URLs off. Until `triggers deploy` applies `workers_dev`/`preview_urls` from `wrangler.jsonc`, uploads succeed but Wrangler reports no alias URL, so `preview:deploy` fails with "no preview alias URL".
 
+### Production deploys
+
+Production is the `todo` Worker at **https://todo.personal-d9e.workers.dev**, with the `todo` D1 database. It signs in with the Clerk development instance (ADR-0002).
+
+```bash
+url=$(npm run -s production:deploy)
+```
+
+`scripts/production-deploy.ts` builds the app for the top-level (production) environment (`CLOUDFLARE_ENV` is cleared), applies pending migrations to the remote `todo` D1, then runs `wrangler deploy`. Each step stops the release if it fails, so a failed migration never ships new code, and nothing in it names the `preview` environment. The production URL, read from Wrangler's machine-readable output, is the only line on stdout. Releases normally happen from CI (see [Releasing to production](#releasing-to-production)), not by hand.
+
+#### First-time setup of `todo`
+
+Before the first production run, once (not part of CI):
+
+```bash
+npx wrangler secret put CLERK_SECRET_KEY                  # no --env: the `todo` Worker; answer yes to create it
+npx wrangler triggers deploy --config wrangler.jsonc      # turn on the workers.dev URL
+```
+
+The `secret put` value is the Clerk development instance's secret key (the same one the `production` GitHub Environment holds). If the `todo` Worker is created by `wrangler deploy` itself, `triggers deploy` is not needed; it is for a Worker first created by `secret put`, whose workers.dev URL starts off. Without it, the deploy succeeds but reports no workers.dev URL, so `production:deploy` fails with "no workers.dev URL".
+
 ## CI on pull requests
 
 `.github/workflows/pr.yml` runs on every pull request (opened, synchronize, reopened). A new push cancels the PR's in-flight run. Its job names are what branch protection requires, so keep them stable:
@@ -152,6 +173,20 @@ The sticky comment is rendered by `scripts/preview-comment.ts` (a table of `labe
 ### Storybook on previews
 
 `scripts/preview-deploy.ts` runs `storybook build --output-dir dist/client/storybook` after the app build, so Storybook rides along in the preview's static assets and is served at `<preview URL>/storybook/` (`/storybook` redirects there). Storybook uses its own Vite config (`.storybook/vite.config.ts`) and emits relative asset paths, so the sub-path needs no extra setting. Production deploys run `vite build` alone, which empties `dist/`, so Storybook never reaches production.
+
+## Releasing to production
+
+Merging is releasing. `.github/workflows/production.yml` runs on every push to `main` (in practice, merging a pull request) and deploys to https://todo.personal-d9e.workers.dev:
+
+| Job | What it does |
+| --- | --- |
+| `Checks` | `npm run check`, `npm run typecheck`, `npm test` |
+| `Production deploy` | `npm run -s production:deploy` with the `production` environment's secrets: migrates the `todo` D1, then deploys the `todo` Worker; exposes the URL as the job output `url` and on the `production` environment |
+| `Smoke E2E` | `npm run e2e -- e2e/smoke.spec.ts` with `BASE_URL` set to the production URL; a failure marks the run red and uploads the `playwright-report` artifact |
+
+Only one release runs at a time (concurrency group `production`). A running release is never cancelled, since it may be between migrating and deploying; a newer push waits for it. Secrets come from the GitHub Environment `production`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`. The Worker secret `CLERK_SECRET_KEY` must be set once by hand first: see [First-time setup of `todo`](#first-time-setup-of-todo).
+
+A red `Smoke E2E` means the new version is already live: fix forward with another merge, or roll back with `npx wrangler rollback` (code only; migrations are not undone).
 
 
 ## Setting up Clerk
