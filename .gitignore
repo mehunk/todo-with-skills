@@ -18,3 +18,8 @@ todos.json
 # Storybook
 storybook-static
 *storybook.log
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
