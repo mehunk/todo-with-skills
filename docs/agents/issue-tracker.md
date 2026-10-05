@@ -1,12 +1,27 @@
 # Issue tracker: Linear
 
-Issues and specs for this repo live in Linear, team **Todo-with-skills**. Use the
+Specs and tickets for this repo live in Linear, team **Todo-with-skills**. Use the
 `linear-todo-with-skills` MCP server for all operations (configured in `.mcp.json`).
-Issues are not attached to a project unless the user asks.
 
-## Conventions
+**Specs and tickets are different things, stored differently:**
 
-- **Create an issue**: `save_issue` with `team: "Todo-with-skills"`, `title`, Markdown `description`, `state: "Backlog"`.
+- A **spec** is a Linear **Project**, with the spec text in a project **Document** titled "Spec". The project description just points at that document and at the repo docs (`GLOSSARY.md`, `docs/adr/`, `docs/ui.md`).
+- A **ticket** is a Linear **Issue** in that project. Tickets are never sub-issues of anything; their task graph is expressed only through `blockedBy` relations.
+- Issues not tied to a spec (bugs, triage) are plain issues with no project.
+
+Example: project `P-TOD-1` "Personal Lists and Todos (v1)" → document "Spec" → issues TOD-6 … TOD-17.
+
+## Specs (Projects)
+
+- **Publish a spec** (`/to-spec`): `save_project` with `name`, `addTeams: ["Todo-with-skills"]`, `lead: "me"`, `state: "planned"`, a one-line `summary`; then `save_document` with `project: <project>`, `title: "Spec"`, and the spec as `content`. Triage labels don't apply to projects.
+- **Fetch a spec**: `get_project` with its identifier (e.g. `P-TOD-1`), then read its "Spec" document with `get_document`; list its tickets with `list_issues` filtered by `project`.
+- **Update a spec**: `save_document` with `id` and `patch` (prefer patches over resending the whole text).
+- **Spec work started / finished**: `save_project` with `state: "started"` when the first ticket is claimed; `state: "completed"` when every ticket is Done or Canceled. "Close the spec" means this.
+- **Comment on a spec**: `save_comment` with `documentId` (the Spec document) or `projectId`.
+
+## Tickets (Issues)
+
+- **Create an issue**: `save_issue` with `team: "Todo-with-skills"`, `title`, Markdown `description`, `state: "Backlog"`. For a spec's ticket (`/to-tickets`) also pass `project: <spec project>`, start the description with a `## Spec` section linking the Spec document, and set `blockedBy` to its blockers.
 - **Read an issue**: `get_issue` with its identifier (e.g. `TOD-12`), plus `list_comments` for discussion.
 - **List issues**: `list_issues` filtered by team, `state` and/or `label`.
 - **Comment on an issue**: `save_comment`.
@@ -31,11 +46,17 @@ Refer to issues by their Linear identifier (`<TEAM>-<n>`).
 
 ## When a skill says "publish to the issue tracker"
 
-Create a Linear issue in team Todo-with-skills (see Conventions).
+- Publishing a **spec** → create a Project + "Spec" document (see Specs).
+- Publishing **tickets** → create Issues in that Project (see Tickets).
+- Anything else (a bug, a triage item) → a plain Issue with no project.
 
 ## When a skill says "fetch the relevant ticket"
 
-`get_issue` with its identifier, then `list_comments`.
+`get_issue` with its identifier, then `list_comments`. If the skill means the spec (e.g. `/implement-spec P-TOD-1`), fetch the Project and its Spec document instead.
+
+## When a skill says "the spec and its tickets"
+
+The Spec document of the Project, plus every Issue in that Project. Skip issues labelled `ready-for-human`: they are for a person, not an agent.
 
 ## Wayfinding operations
 

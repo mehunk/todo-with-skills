@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live in Linear (team Todo-with-skills), accessed via the `linear-todo-with-skills` MCP server. See `docs/agents/issue-tracker.md`.
+Linear (team Todo-with-skills), via the `linear-todo-with-skills` MCP server: a spec is a Project with a "Spec" document, its tickets are Issues in that Project linked by `blockedBy`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
