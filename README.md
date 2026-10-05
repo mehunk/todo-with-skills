@@ -41,6 +41,27 @@ npm run format
 npm run check
 ```
 
+## Database (D1 + Drizzle)
+
+Data lives in Cloudflare D1, bound as `DB` in `wrangler.jsonc` and accessed through Drizzle (`createDb(env.DB)` from `src/db`, with `env` from `cloudflare:workers` in server code). The `database_id` in `wrangler.jsonc` is a placeholder: only the local database (stored under `.wrangler/state`) is used until a remote one is created.
+
+Schema changes are versioned migrations, never edited by hand once applied, and must be additive (see `docs/adr/0003-separate-preview-worker.md`):
+
+1. Change the Drizzle schema in `src/db/schema.ts`.
+2. Generate a migration into `migrations/`: `npm run db:generate`
+3. Apply pending migrations to the local database: `npm run db:migrate:local`
+
+`npm run dev` uses the same local database, so apply migrations before starting it. After changing bindings in `wrangler.jsonc`, regenerate `worker-configuration.d.ts` with `npm run cf-typegen`.
+
+## Tests
+
+```bash
+npm test            # run once
+npm run test:watch  # watch mode
+```
+
+Vitest runs tests inside the Workers runtime (`@cloudflare/vitest-pool-workers`, configured in `vitest.config.ts`) against a real local D1. Every test file gets its own fresh database with all migrations applied, and rows are deleted after each test, so tests never see each other's data. Seed data in `beforeEach` or the test itself, not `beforeAll`. The Todos module (`src/todos`) is the test seam for product behaviour; see `src/todos/todos.test.ts` for the pattern.
+
 
 ## Deploy to Cloudflare Workers
 
