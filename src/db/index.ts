@@ -6,7 +6,7 @@ import * as schema from "./schema";
  * `cloudflare:workers`; in tests pass the per-test-file `env.DB`.
  */
 export function createDb(d1: D1Database) {
-	return drizzle(d1, { schema });
+  return drizzle(d1, { schema });
 }
 
 export type Database = ReturnType<typeof createDb>;

@@ -5,8 +5,8 @@ import type { Database } from "#/db";
  * Todos. Operations arrive with the Personal Lists and Todos (v1) slices.
  */
 export function createTodos(db: Database) {
-	void db;
-	return {};
+  void db;
+  return {};
 }
 
 export type Todos = ReturnType<typeof createTodos>;
