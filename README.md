@@ -122,7 +122,7 @@ npm run preview:deploy -- <alias>   # e.g. pr-42
 url=$(npm run -s preview:deploy -- pr-42)
 ```
 
-`scripts/preview-deploy.ts` builds the app for the `preview` environment (`CLOUDFLARE_ENV=preview vite build`), applies pending migrations to the remote `todo-preview` D1, and uploads a new version of `todo-preview` with `wrangler versions upload --preview-alias <alias>`. The alias URL, `https://<alias>-todo-preview.personal-d9e.workers.dev`, is the only line it prints on stdout (all build and Wrangler output goes to stderr), so CI can capture it. The URL is read from Wrangler's machine-readable output file, not its console log. Aliases must be lowercase letters, digits and dashes, starting with a letter.
+`scripts/preview-deploy.ts` builds the app for the `preview` environment (`CLOUDFLARE_ENV=preview vite build`), applies pending migrations to the remote `todo-preview` D1, and uploads a new version of `todo-preview` with `wrangler versions upload --preview-alias <alias>`. The alias URL, `https://<alias>-todo-preview.personal-d9e.workers.dev`, is the only line it prints on stdout (all build and Wrangler output goes to stderr), so CI can capture it. The URL is read from Wrangler's machine-readable output file, not its console log. Aliases must be lowercase letters, digits and dashes, starting with a letter; the script rejects any other alias before building.
 
 #### First-time setup of `todo-preview`
 
@@ -143,7 +143,7 @@ Production is the `todo` Worker at **https://todo.personal-d9e.workers.dev**, wi
 url=$(npm run -s production:deploy)
 ```
 
-`scripts/production-deploy.ts` builds the app for the top-level (production) environment (`CLOUDFLARE_ENV` is cleared), applies pending migrations to the remote `todo` D1, then runs `wrangler deploy`. Each step stops the release if it fails, so a failed migration never ships new code, and nothing in it names the `preview` environment. The production URL, read from Wrangler's machine-readable output, is the only line on stdout. Releases normally happen from CI (see [Releasing to production](#releasing-to-production)), not by hand.
+`scripts/production-deploy.ts` builds the app for the top-level (production) environment (`CLOUDFLARE_ENV` is cleared), applies pending migrations to the remote `todo` D1, then runs `wrangler deploy`. There is no plain `npm run deploy`: every deploy goes through `preview:deploy` or `production:deploy`, so migrations always run. Each step stops the release if it fails, so a failed migration never ships new code, and nothing in it names the `preview` environment. The production URL, read from Wrangler's machine-readable output, is the only line on stdout. Releases normally happen from CI (see [Releasing to production](#releasing-to-production)), not by hand.
 
 #### First-time setup of `todo`
 
@@ -165,8 +165,13 @@ The `secret put` value is the Clerk development instance's secret key (the same 
 | `Checks` | every PR, forks included, no secrets | `npm run check` (Biome format + lint), `npm run typecheck`, `npm test`, `npm run build`, `npm run build-storybook` |
 | `Preview deploy` | after `Checks`, only for PRs from branches of this repo | `npm run -s preview:deploy -- pr-<N>` with the `preview` environment's secrets (builds the app and Storybook, migrates the `todo-preview` D1, uploads alias `pr-<N>`), exposes the URL as the job output `url`, then posts or updates the PR's sticky preview comment |
 | `E2E` | after `Preview deploy` | `npm run e2e` with `BASE_URL` set to the preview URL and `E2E_STORYBOOK=1` (so `e2e/storybook.spec.ts` checks `/storybook/`); on failure uploads `playwright-report/` and `test-results/` as the `playwright-report` artifact |
+| `PR pipeline` | always, after all of the above | the gate: passes only if `Checks`, `Preview deploy` and `E2E` all succeeded; a skipped job counts as a failure |
 
-Secrets come from the GitHub Environment `preview`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLERK_PUBLISHABLE_KEY` (passed to the build as `VITE_CLERK_PUBLISHABLE_KEY` and to Playwright as itself), `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`. Fork PRs get only `Checks`: the deploy and E2E jobs are skipped because they would need secrets. `pull_request_target` is never used.
+Branch protection on `main` requires two checks: `Checks` and `PR pipeline`. Require the gate rather than `Preview deploy`/`E2E` directly: GitHub reports a skipped job as passing, so a fork PR would otherwise satisfy the required checks without ever being deployed or tested.
+
+Secrets come from the GitHub Environment `preview`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLERK_PUBLISHABLE_KEY` (passed to the build as `VITE_CLERK_PUBLISHABLE_KEY` and to Playwright as itself), `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`. Fork PRs get only `Checks`: the deploy and E2E jobs are skipped because they would need secrets, so `PR pipeline` fails and the PR stays red. To land one, a maintainer reviews it, re-pushes its branch to this repository (e.g. `gh pr checkout <N>`, then push `HEAD` to a new branch on `origin`) and opens a PR from that branch, which runs the full pipeline. `pull_request_target` is never used.
+
+The `preview` and `production` environments share one account-scoped `CLOUDFLARE_API_TOKEN`, an accepted trade-off: preview CI could technically deploy production. ADR-0003's separate Worker guards against the workflow overwriting production by accident, not against a hostile PR (fork PRs never get secrets).
 
 The sticky comment is rendered by `scripts/preview-comment.ts` (a table of `label | url` rows plus the commit) and posted by `scripts/post-preview-comment.ts <pr> <sha> <label>=<url>...` through `gh`. It finds its earlier comment by the `<!-- preview-deploy -->` marker and edits it. It lists the app (`App=<url>`) and Storybook (`Storybook=<url>/storybook/`); to show another link, pass another `<label>=<url>` argument in the workflow.
 
@@ -180,11 +185,11 @@ Merging is releasing. `.github/workflows/production.yml` runs on every push to `
 
 | Job | What it does |
 | --- | --- |
-| `Checks` | `npm run check`, `npm run typecheck`, `npm test` |
+| `Release checks` | `npm run check`, `npm run typecheck`, `npm test` |
 | `Production deploy` | `npm run -s production:deploy` with the `production` environment's secrets: migrates the `todo` D1, then deploys the `todo` Worker; exposes the URL as the job output `url` and on the `production` environment |
-| `Smoke E2E` | `npm run e2e -- e2e/smoke.spec.ts` with `BASE_URL` set to the production URL; a failure marks the run red and uploads the `playwright-report` artifact |
+| `Smoke E2E` | `npm run e2e -- e2e/smoke.spec.ts e2e/no-storybook.spec.ts` with `BASE_URL` set to the production URL and `E2E_NO_STORYBOOK=1` (so it also checks production does not serve `/storybook/`); a failure marks the run red and uploads the `playwright-report` artifact |
 
-Only one release runs at a time (concurrency group `production`). A running release is never cancelled, since it may be between migrating and deploying; a newer push waits for it. Secrets come from the GitHub Environment `production`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`. The Worker secret `CLERK_SECRET_KEY` must be set once by hand first: see [First-time setup of `todo`](#first-time-setup-of-todo).
+Only one release runs at a time (concurrency group `production`). A running release is never cancelled, since it may be between migrating and deploying; a newer push waits for it. GitHub keeps only the newest pending run in the group: if several pushes land during a release, the older waiting runs are cancelled and only the newest (which contains their commits) deploys next. Secrets come from the GitHub Environment `production`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`. The Worker secret `CLERK_SECRET_KEY` must be set once by hand first: see [First-time setup of `todo`](#first-time-setup-of-todo).
 
 A red `Smoke E2E` means the new version is already live: fix forward with another merge, or roll back with `npx wrangler rollback` (code only; migrations are not undone).
 

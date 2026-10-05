@@ -4,4 +4,4 @@ Each pull request is deployed to a separate `todo-preview` Worker (a Wrangler `p
 
 ## Consequences
 
-Previews share one D1 database, so migrations must be additive (no dropping or renaming columns) and E2E tests create and delete their own uniquely named data. Revisit Worker Previews once it is generally available.
+Previews share one D1 database, so migrations must be additive (no dropping or renaming columns) and E2E tests create and delete their own uniquely named data. Preview and production CI share one account-scoped Cloudflare API token, an accepted trade-off: the separate Worker protects production from accidental overwrites by the preview workflow, not from a hostile PR, since preview CI could technically deploy production. Revisit Worker Previews once it is generally available.
