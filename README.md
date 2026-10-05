@@ -43,7 +43,7 @@ npm run check
 
 ## Database (D1 + Drizzle)
 
-Data lives in Cloudflare D1, bound as `DB` in `wrangler.jsonc` and accessed through Drizzle (`createDb(env.DB)` from `src/db`, with `env` from `cloudflare:workers` in server code). The `database_id` in `wrangler.jsonc` is a placeholder: only the local database (stored under `.wrangler/state`) is used until a remote one is created.
+Data lives in Cloudflare D1, bound as `DB` in `wrangler.jsonc` and accessed through Drizzle (`createDb(env.DB)` from `src/db`, with `env` from `cloudflare:workers` in server code). Production binds the remote `todo` database and the `preview` environment binds `todo-preview`; `npm run dev` and the tests only ever use the local copy (stored under `.wrangler/state`).
 
 Schema changes are versioned migrations, never edited by hand once applied, and must be additive (see `docs/adr/0003-separate-preview-worker.md`):
 
@@ -65,15 +65,30 @@ Vitest runs tests inside the Workers runtime (`@cloudflare/vitest-pool-workers`,
 
 ## Deploy to Cloudflare Workers
 
-This project uses the Cloudflare Vite plugin (configured in `vite.config.ts`) and `wrangler.jsonc`:
+This project uses the Cloudflare Vite plugin (configured in `vite.config.ts`) and `wrangler.jsonc`, which has two environments in the "Personal" Cloudflare account (see `docs/adr/0003-separate-preview-worker.md`):
 
-1. Install Wrangler: `npm install -g wrangler`
-2. Authenticate: `wrangler login`
-3. Deploy: `npx wrangler deploy`
+| Environment | Worker | D1 database |
+| --- | --- | --- |
+| production (top level) | `todo` | `todo` |
+| `preview` | `todo-preview` | `todo-preview` |
 
-For production env vars, run `wrangler secret put MY_VAR` for each secret listed in `.env.example`. Public (non-secret) vars go in `wrangler.jsonc` under `vars`.
+Clerk keys: `VITE_CLERK_PUBLISHABLE_KEY` must be set when building (Vite reads it from the shell or `.env.local` and inlines it); `CLERK_SECRET_KEY` is a Worker secret, set once per environment (it prompts for the value):
 
-KV, D1, R2, and Durable Object bindings are configured in `wrangler.jsonc` — see https://developers.cloudflare.com/workers/wrangler/configuration/.
+```bash
+npx wrangler secret put CLERK_SECRET_KEY --env preview   # todo-preview
+npx wrangler secret put CLERK_SECRET_KEY                 # todo (production)
+```
+
+### Preview deploys
+
+```bash
+npm run preview:deploy -- <alias>   # e.g. pr-42
+url=$(npm run -s preview:deploy -- pr-42)
+```
+
+`scripts/preview-deploy.ts` builds the app for the `preview` environment (`CLOUDFLARE_ENV=preview vite build`), applies pending migrations to the remote `todo-preview` D1, and uploads a new version of `todo-preview` with `wrangler versions upload --preview-alias <alias>`. The alias URL, `https://<alias>-todo-preview.personal-d9e.workers.dev`, is the only line it prints on stdout (all build and Wrangler output goes to stderr), so CI can capture it. The URL is read from Wrangler's machine-readable output file, not its console log. Aliases must be lowercase letters, digits and dashes, starting with a letter.
+
+`versions upload` only works once the `todo-preview` Worker exists. On a fresh account, create it first, e.g. by running the `wrangler secret put CLERK_SECRET_KEY --env preview` command above and answering yes when it offers to create the Worker.
 
 
 ## Setting up Clerk

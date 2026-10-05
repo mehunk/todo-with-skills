@@ -1,17 +1,43 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "tanstack-start-app",
+  // Top level is production: the `todo` Worker and the `todo` D1 database.
+  // `npm run dev` and the tests use this binding too, but only ever against
+  // the local (Miniflare) copy of the database.
+  "name": "todo",
+  // The "Personal" Cloudflare account (pins it for logins with several).
+  "account_id": "d9e9f2e7432b7071a7c19404d0a82921",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
+  "workers_dev": true,
+  "preview_urls": true,
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "todo-with-skills",
-      // Placeholder: only the local (Miniflare) database is used so far.
-      // Replace it with the real ID when the remote database is created.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "todo",
+      "database_id": "41280b99-8a3f-4e2f-b12d-8c928c201838",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  // Clerk: VITE_CLERK_PUBLISHABLE_KEY is read from the build environment and
+  // inlined by Vite; CLERK_SECRET_KEY is a Worker secret set per environment
+  // with `wrangler secret put CLERK_SECRET_KEY [--env preview]`.
+  "env": {
+    // Pull request previews (ADR-0003): a separate `todo-preview` Worker,
+    // deployed with `wrangler versions upload --preview-alias pr-<N>`, all
+    // sharing the `todo-preview` D1 database.
+    "preview": {
+      "name": "todo-preview",
+      "workers_dev": true,
+      "preview_urls": true,
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "todo-preview",
+          "database_id": "e6c87de0-4e97-4c4e-ac52-5816849502c8",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
 }
