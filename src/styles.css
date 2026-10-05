@@ -7,7 +7,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn zinc base, lagoon-teal overrides from docs/ui.md "Tokens". */
+/* shadcn zinc base with the overrides listed in docs/ui.md "Tokens". */
 :root,
 .light {
   --background: oklch(1 0 0);

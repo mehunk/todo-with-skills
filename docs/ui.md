@@ -24,6 +24,20 @@ Base: shadcn `zinc`. Overrides:
 | `--accent` | `oklch(0.96 0.02 195)` | `oklch(0.28 0.04 200)` |
 | `--accent-foreground` | `oklch(0.35 0.07 200)` | `oklch(0.9 0.06 185)` |
 | `--destructive` | `oklch(0.577 0.245 27.325)` | `oklch(0.704 0.191 22.216)` |
+| `--destructive-foreground` | `oklch(0.99 0 0)` | `oklch(0.99 0 0)` |
+| `--overlay` | `oklch(0 0 0 / 0.5)` | `oklch(0 0 0 / 0.6)` |
+| `--card` | zinc (`oklch(1 0 0)`) | `oklch(0.141 0.005 285.823)` |
+| `--popover` | zinc (`oklch(1 0 0)`) | `oklch(0.21 0.006 285.885)` |
+| `--border` | zinc (`oklch(0.92 0.004 286.32)`) | `oklch(0.274 0.006 286.033)` |
+| `--input` | zinc (`oklch(0.92 0.004 286.32)`) | `oklch(0.274 0.006 286.033)` |
+
+Why the additions beyond zinc:
+
+- `--destructive-foreground`: text on a solid `bg-destructive` (destructive buttons), so shadcn components never fall back to a raw `text-white`.
+- `--overlay`: the dialog and sheet scrim (`bg-overlay`), replacing shadcn's raw `bg-black/50`; a touch darker in dark mode so it still reads over dark cards.
+- Dark `--card`: equal to `--background`, so the cards stand out against the `bg-muted/50` canvas instead of blending into it.
+- Dark `--popover`: kept a step lighter than the card so popovers and menus lift off the card they open from.
+- Dark `--border` / `--input`: an opaque zinc instead of zinc's translucent white, so card edges and inputs stay crisp on the muted canvas.
 
 - **Font**: Manrope (`font-sans`) everywhere. Numbers that line up (counts, dates) use `tabular-nums`.
 - **Type scale**: List title `text-base font-semibold`; Todo title `text-sm`; secondary text (counts, Due dates, section labels) `text-xs text-muted-foreground`.
