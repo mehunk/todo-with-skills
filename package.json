@@ -13,6 +13,7 @@
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
+    "typecheck": "tsc --noEmit",
     "deploy": "npm run build && wrangler deploy",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",

@@ -38,7 +38,8 @@ This project uses [Biome](https://biomejs.dev/) for linting and formatting. The 
 ```bash
 npm run lint
 npm run format
-npm run check
+npm run check      # format + lint, read-only (what CI runs)
+npm run typecheck  # tsc --noEmit
 ```
 
 ## Database (D1 + Drizzle)
@@ -123,7 +124,30 @@ url=$(npm run -s preview:deploy -- pr-42)
 
 `scripts/preview-deploy.ts` builds the app for the `preview` environment (`CLOUDFLARE_ENV=preview vite build`), applies pending migrations to the remote `todo-preview` D1, and uploads a new version of `todo-preview` with `wrangler versions upload --preview-alias <alias>`. The alias URL, `https://<alias>-todo-preview.personal-d9e.workers.dev`, is the only line it prints on stdout (all build and Wrangler output goes to stderr), so CI can capture it. The URL is read from Wrangler's machine-readable output file, not its console log. Aliases must be lowercase letters, digits and dashes, starting with a letter.
 
-`versions upload` only works once the `todo-preview` Worker exists. On a fresh account, create it first, e.g. by running the `wrangler secret put CLERK_SECRET_KEY --env preview` command above and answering yes when it offers to create the Worker.
+#### First-time setup of `todo-preview`
+
+`versions upload` only works once the `todo-preview` Worker exists with its workers.dev and preview URLs turned on. On a fresh account, run these once (not part of CI):
+
+```bash
+npx wrangler secret put CLERK_SECRET_KEY --env preview             # answer yes to create todo-preview
+npx wrangler triggers deploy --env preview --config wrangler.jsonc # turn on workers.dev + preview URLs
+```
+
+A Worker created by `secret put` starts with its workers.dev and preview URLs off. Until `triggers deploy` applies `workers_dev`/`preview_urls` from `wrangler.jsonc`, uploads succeed but Wrangler reports no alias URL, so `preview:deploy` fails with "no preview alias URL".
+
+## CI on pull requests
+
+`.github/workflows/pr.yml` runs on every pull request (opened, synchronize, reopened). A new push cancels the PR's in-flight run. Its job names are what branch protection requires, so keep them stable:
+
+| Job | Runs | What it does |
+| --- | --- | --- |
+| `Checks` | every PR, forks included, no secrets | `npm run check` (Biome format + lint), `npm run typecheck`, `npm test`, `npm run build` |
+| `Preview deploy` | after `Checks`, only for PRs from branches of this repo | `npm run -s preview:deploy -- pr-<N>` with the `preview` environment's secrets (migrates the `todo-preview` D1, uploads alias `pr-<N>`), exposes the URL as the job output `url`, then posts or updates the PR's sticky preview comment |
+| `E2E` | after `Preview deploy` | `npm run e2e` with `BASE_URL` set to the preview URL; on failure uploads `playwright-report/` and `test-results/` as the `playwright-report` artifact |
+
+Secrets come from the GitHub Environment `preview`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLERK_PUBLISHABLE_KEY` (passed to the build as `VITE_CLERK_PUBLISHABLE_KEY` and to Playwright as itself), `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`. Fork PRs get only `Checks`: the deploy and E2E jobs are skipped because they would need secrets. `pull_request_target` is never used.
+
+The sticky comment is rendered by `scripts/preview-comment.ts` (a table of `label | url` rows plus the commit) and posted by `scripts/post-preview-comment.ts <pr> <sha> <label>=<url>...` through `gh`. It finds its earlier comment by the `<!-- preview-deploy -->` marker and edits it. To show another link (e.g. Storybook), pass another `<label>=<url>` argument in the workflow.
 
 
 ## Setting up Clerk
