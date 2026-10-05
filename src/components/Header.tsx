@@ -12,7 +12,7 @@ export default function Header() {
           to="/"
           className="flex items-center gap-2 rounded-md text-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
-          <ListChecksIcon className="size-5" aria-hidden />
+          <ListChecksIcon className="size-4" aria-hidden />
           Todo
         </Link>
         <Link

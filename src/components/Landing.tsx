@@ -47,7 +47,7 @@ export function Landing({ signIn }: { signIn: ReactNode }) {
             key={title}
             className="flex flex-col gap-2 rounded-xl border bg-card p-4 text-card-foreground shadow-sm"
           >
-            <Icon className="size-5 text-muted-foreground" aria-hidden />
+            <Icon className="size-4 text-muted-foreground" aria-hidden />
             <h2 className="text-sm font-semibold">{title}</h2>
             <p className="text-xs text-muted-foreground">{text}</p>
           </li>
