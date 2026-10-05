@@ -19,16 +19,16 @@ npm run build
 
 ## Styling
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+Tailwind CSS v4 with shadcn/ui. All UI follows the design system in [`docs/ui.md`](docs/ui.md): semantic tokens only (defined in `src/styles.css`), light and dark mode.
 
-### Removing Tailwind CSS
+### Storybook
 
-If you prefer not to use Tailwind CSS:
+```bash
+npm run storybook        # http://localhost:6006
+npm run build-storybook  # static build in storybook-static/
+```
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+Storybook uses its own Vite config (`.storybook/vite.config.ts`, React + Tailwind only), so the app's TanStack Start, Cloudflare and devtools plugins never load in it. Switch light/dark from the toolbar theme menu. The **Foundations** page shows the design tokens.
 
 ## Linting & Formatting
 
@@ -40,6 +40,27 @@ npm run lint
 npm run format
 npm run check
 ```
+
+## Database (D1 + Drizzle)
+
+Data lives in Cloudflare D1, bound as `DB` in `wrangler.jsonc` and accessed through Drizzle (`createDb(env.DB)` from `src/db`, with `env` from `cloudflare:workers` in server code). The `database_id` in `wrangler.jsonc` is a placeholder: only the local database (stored under `.wrangler/state`) is used until a remote one is created.
+
+Schema changes are versioned migrations, never edited by hand once applied, and must be additive (see `docs/adr/0003-separate-preview-worker.md`):
+
+1. Change the Drizzle schema in `src/db/schema.ts`.
+2. Generate a migration into `migrations/`: `npm run db:generate`
+3. Apply pending migrations to the local database: `npm run db:migrate:local`
+
+`npm run dev` uses the same local database, so apply migrations before starting it. After changing bindings in `wrangler.jsonc`, regenerate `worker-configuration.d.ts` with `npm run cf-typegen`.
+
+## Tests
+
+```bash
+npm test            # run once
+npm run test:watch  # watch mode
+```
+
+Vitest runs tests inside the Workers runtime (`@cloudflare/vitest-pool-workers`, configured in `vitest.config.ts`) against a real local D1. Every test file gets its own fresh database with all migrations applied, and after each test every row is deleted and AUTOINCREMENT counters are reset, so no test sees another's rows or inherits its ids (schema created in a file, e.g. in `beforeAll`, does persist across that file's tests). Seed data in `beforeEach` or the test itself, not `beforeAll`. The Todos module (`src/todos`) is the test seam for product behaviour; see `src/todos/todos.test.ts` for the pattern.
 
 
 ## Deploy to Cloudflare Workers
@@ -65,14 +86,13 @@ KV, D1, R2, and Durable Object bindings are configured in `wrangler.jsonc` — s
    CLERK_SECRET_KEY=sk_test_...
    ```
 
-3. Start the app and visit `/demo/clerk`.
+3. Start the app and use the Sign in button in the header.
 
 ### What's wired up
 
 - `clerkMiddleware()` authenticates each server request from `src/start.ts`.
 - `<ClerkProvider>` supplies auth state throughout the app.
 - `<SignInButton>` and `<UserButton>` in the header respond to the session.
-- `/demo/clerk` shows Clerk's prebuilt sign-in UI and signed-in user data.
 
 ### Protecting a route
 
@@ -112,8 +132,10 @@ are the security boundary. See Clerk's [TanStack Start docs](https://clerk.com/d
 Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
 
 ```bash
-pnpm dlx shadcn@latest add button
+npx shadcn@latest add button
 ```
+
+After adding, check that generated files import `cn` from `#/lib/utils` and use only semantic colour tokens (see `docs/ui.md`).
 
 
 ## T3Env
@@ -276,11 +298,6 @@ function PeopleComponent() {
 ```
 
 Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
 
 
 # Learn More
