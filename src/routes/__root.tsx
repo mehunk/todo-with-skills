@@ -3,11 +3,13 @@ import type { QueryClient } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
 	HeadContent,
+	Link,
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import Footer from "../components/Footer";
 import Header from "../components/Header";
+import { Button } from "../components/ui/button";
+import { Toaster } from "../components/ui/sonner";
 import ClerkProvider from "../integrations/clerk/provider";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
@@ -29,7 +31,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "TanStack Start Starter",
+				title: "Todo",
 			},
 		],
 		links: [
@@ -40,7 +42,23 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		],
 	}),
 	shellComponent: RootDocument,
+	notFoundComponent: NotFound,
 });
+
+function NotFound() {
+	return (
+		<main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-start justify-center gap-3 px-4 py-16">
+			<p className="text-xs text-muted-foreground">404</p>
+			<h1 className="text-2xl font-bold tracking-tight">Page not found</h1>
+			<p className="text-sm text-muted-foreground">
+				There is nothing at this address.
+			</p>
+			<Button asChild variant="outline" size="sm">
+				<Link to="/">Go home</Link>
+			</Button>
+		</main>
+	);
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
@@ -50,11 +68,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 				<HeadContent />
 			</head>
-			<body className="font-sans antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
+			<body className="flex min-h-dvh flex-col [overflow-wrap:anywhere]">
 				<ClerkProvider>
 					<Header />
 					{children}
-					<Footer />
+					<Toaster />
 					<TanStackDevtools
 						config={{
 							position: "bottom-right",
