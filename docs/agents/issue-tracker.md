@@ -40,6 +40,14 @@ Refer to issues by their Linear identifier (`<TEAM>-<n>`).
 | Done        | Completed                                       |
 | Canceled    | Will not be actioned                            |
 
+## Closing work: through pull requests
+
+**This tracker closes work through PRs: yes.** Every spec lands as **one pull request** from its integration branch into `main` (`/implement-spec` opens it as a draft after the first merge and marks it ready at the end). Ticket branches are internal and never get their own PR.
+
+- PR title: the spec's project name. PR body (written with `/pr`): link the Spec document and list every ticket identifier (e.g. `Fixes TOD-6`, `Fixes TOD-7`) so Linear's GitHub integration moves them to Done on merge.
+- A human reviews the PR (and its preview, once the Delivery pipeline exists) and merges it. Agents never merge to `main`.
+- After merge, set the spec's Project to `completed` if every ticket is Done or Canceled.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
