@@ -40,11 +40,36 @@ describe("Workers test harness", () => {
       expect(await countRows()).toEqual({ parents: 0, children: 0 });
     });
   });
+
+  describe("per-test autoincrement reset", () => {
+    beforeAll(async () => {
+      await env.DB.prepare(
+        "create table harness_counter (id integer primary key autoincrement, note text)",
+      ).run();
+    });
+
+    // Both tests insert one row; each must get id 1, proving sqlite_sequence
+    // does not carry ids over from the previous test.
+    it("gives the first test's row id 1", async () => {
+      expect(await insertCounterRow()).toBe(1);
+    });
+
+    it("gives the next test's row id 1 again", async () => {
+      expect(await insertCounterRow()).toBe(1);
+    });
+  });
 });
+
+async function insertCounterRow() {
+  const row = await env.DB.prepare(
+    "insert into harness_counter (note) values ('x') returning id",
+  ).first<{ id: number }>();
+  return row?.id;
+}
 
 function countRows() {
   return env.DB.prepare(
     `select (select count(*) from harness_parent) as parents,
-		        (select count(*) from harness_child) as children`,
+            (select count(*) from harness_child) as children`,
   ).first<{ parents: number; children: number }>();
 }

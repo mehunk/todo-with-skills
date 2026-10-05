@@ -60,7 +60,7 @@ npm test            # run once
 npm run test:watch  # watch mode
 ```
 
-Vitest runs tests inside the Workers runtime (`@cloudflare/vitest-pool-workers`, configured in `vitest.config.ts`) against a real local D1. Every test file gets its own fresh database with all migrations applied, and rows are deleted after each test, so tests never see each other's data. Seed data in `beforeEach` or the test itself, not `beforeAll`. The Todos module (`src/todos`) is the test seam for product behaviour; see `src/todos/todos.test.ts` for the pattern.
+Vitest runs tests inside the Workers runtime (`@cloudflare/vitest-pool-workers`, configured in `vitest.config.ts`) against a real local D1. Every test file gets its own fresh database with all migrations applied, and after each test every row is deleted and AUTOINCREMENT counters are reset, so no test sees another's rows or inherits its ids (schema created in a file, e.g. in `beforeAll`, does persist across that file's tests). Seed data in `beforeEach` or the test itself, not `beforeAll`. The Todos module (`src/todos`) is the test seam for product behaviour; see `src/todos/todos.test.ts` for the pattern.
 
 
 ## Deploy to Cloudflare Workers
