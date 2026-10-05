@@ -19,15 +19,16 @@ npm run build
 
 ## Styling
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+Tailwind CSS v4 with shadcn/ui. All UI follows the design system in [`docs/ui.md`](docs/ui.md): semantic tokens only (defined in `src/styles.css`), light and dark mode.
 
-### Removing Tailwind CSS
+### Storybook
 
-If you prefer not to use Tailwind CSS:
+```bash
+npm run storybook        # http://localhost:6006
+npm run build-storybook  # static build in storybook-static/
+```
 
-1. Replace the Tailwind import in `src/styles.css` with your own styles
-2. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-3. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+Storybook uses its own Vite config (`.storybook/vite.config.ts`, React + Tailwind only), so the app's TanStack Start, Cloudflare and devtools plugins never load in it. Switch light/dark from the toolbar theme menu. The **Foundations** page shows the design tokens.
 
 ## Linting & Formatting
 
@@ -110,8 +111,10 @@ are the security boundary. See Clerk's [TanStack Start docs](https://clerk.com/d
 Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
 
 ```bash
-pnpm dlx shadcn@latest add button
+npx shadcn@latest add button
 ```
+
+After adding, check that generated files import `cn` from `#/lib/utils` and use only semantic colour tokens (see `docs/ui.md`).
 
 
 ## T3Env

@@ -14,3 +14,7 @@ todos.json
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Storybook
+storybook-static
+*storybook.log
