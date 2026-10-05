@@ -141,13 +141,17 @@ A Worker created by `secret put` starts with its workers.dev and preview URLs of
 
 | Job | Runs | What it does |
 | --- | --- | --- |
-| `Checks` | every PR, forks included, no secrets | `npm run check` (Biome format + lint), `npm run typecheck`, `npm test`, `npm run build` |
-| `Preview deploy` | after `Checks`, only for PRs from branches of this repo | `npm run -s preview:deploy -- pr-<N>` with the `preview` environment's secrets (migrates the `todo-preview` D1, uploads alias `pr-<N>`), exposes the URL as the job output `url`, then posts or updates the PR's sticky preview comment |
-| `E2E` | after `Preview deploy` | `npm run e2e` with `BASE_URL` set to the preview URL; on failure uploads `playwright-report/` and `test-results/` as the `playwright-report` artifact |
+| `Checks` | every PR, forks included, no secrets | `npm run check` (Biome format + lint), `npm run typecheck`, `npm test`, `npm run build`, `npm run build-storybook` |
+| `Preview deploy` | after `Checks`, only for PRs from branches of this repo | `npm run -s preview:deploy -- pr-<N>` with the `preview` environment's secrets (builds the app and Storybook, migrates the `todo-preview` D1, uploads alias `pr-<N>`), exposes the URL as the job output `url`, then posts or updates the PR's sticky preview comment |
+| `E2E` | after `Preview deploy` | `npm run e2e` with `BASE_URL` set to the preview URL and `E2E_STORYBOOK=1` (so `e2e/storybook.spec.ts` checks `/storybook/`); on failure uploads `playwright-report/` and `test-results/` as the `playwright-report` artifact |
 
 Secrets come from the GitHub Environment `preview`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLERK_PUBLISHABLE_KEY` (passed to the build as `VITE_CLERK_PUBLISHABLE_KEY` and to Playwright as itself), `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL`. Fork PRs get only `Checks`: the deploy and E2E jobs are skipped because they would need secrets. `pull_request_target` is never used.
 
-The sticky comment is rendered by `scripts/preview-comment.ts` (a table of `label | url` rows plus the commit) and posted by `scripts/post-preview-comment.ts <pr> <sha> <label>=<url>...` through `gh`. It finds its earlier comment by the `<!-- preview-deploy -->` marker and edits it. To show another link (e.g. Storybook), pass another `<label>=<url>` argument in the workflow.
+The sticky comment is rendered by `scripts/preview-comment.ts` (a table of `label | url` rows plus the commit) and posted by `scripts/post-preview-comment.ts <pr> <sha> <label>=<url>...` through `gh`. It finds its earlier comment by the `<!-- preview-deploy -->` marker and edits it. It lists the app (`App=<url>`) and Storybook (`Storybook=<url>/storybook/`); to show another link, pass another `<label>=<url>` argument in the workflow.
+
+### Storybook on previews
+
+`scripts/preview-deploy.ts` runs `storybook build --output-dir dist/client/storybook` after the app build, so Storybook rides along in the preview's static assets and is served at `<preview URL>/storybook/` (`/storybook` redirects there). Storybook uses its own Vite config (`.storybook/vite.config.ts`) and emits relative asset paths, so the sub-path needs no extra setting. Production deploys run `vite build` alone, which empties `dist/`, so Storybook never reaches production.
 
 
 ## Setting up Clerk
