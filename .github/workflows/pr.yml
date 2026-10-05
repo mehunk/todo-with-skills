@@ -1,5 +1,6 @@
 # Pull request pipeline: static checks, then a preview deploy and the
-# Playwright suite against that preview. See README "CI on pull requests".
+# Playwright suite against that preview, then a gate. See README "CI on pull
+# requests".
 #
 # Job names (`name:`) are what branch protection requires; keep them stable.
 name: PR
@@ -16,20 +17,13 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  NODE_VERSION: 24
-
 jobs:
   checks:
     name: Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: Format and lint
         run: npm run check
       - name: Type check
@@ -57,11 +51,7 @@ jobs:
       url: ${{ steps.deploy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: Migrate preview D1 and upload preview
         id: deploy
         env:
@@ -90,11 +80,7 @@ jobs:
     environment: preview
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Run E2E against the preview
@@ -115,3 +101,23 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
+
+  # The required check that stands for the whole pipeline. A skipped job
+  # reports as passing to branch protection, so a fork PR (deploy and E2E
+  # skipped) would otherwise go green untested. This gate always runs and
+  # passes only when every job above succeeded; a skip counts as a failure.
+  gate:
+    name: PR pipeline
+    needs: [checks, deploy-preview, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to have succeeded
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "Job results: $RESULTS"
+          if [ "$(echo "$RESULTS" | jq 'all(. == "success")')" != "true" ]; then
+            echo "::error::Every PR job must succeed (skipped counts as failed). Fork PRs: a maintainer re-pushes the branch to this repository."
+            exit 1
+          fi

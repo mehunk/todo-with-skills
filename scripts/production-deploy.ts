@@ -10,51 +10,22 @@
  * names the `preview` environment, so `todo-preview` is never touched.
  * All tool output goes to stderr so stdout stays machine-readable.
  */
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import { captureWranglerOutput, run } from "./deploy-steps.ts";
 import { productionUrlFrom } from "./production-url.ts";
+import { d1MigrateArgs } from "./wrangler-commands.ts";
 
 // Production is the top level of wrangler.jsonc: never inherit an environment.
-const env: NodeJS.ProcessEnv = { ...process.env };
-delete env.CLOUDFLARE_ENV;
-delete env.WRANGLER_ENV;
-
-function run(command: string, args: string[], extra: NodeJS.ProcessEnv = {}) {
-  console.error(`\n$ ${command} ${args.join(" ")}`);
-  const result = spawnSync(command, args, {
-    stdio: ["inherit", process.stderr, "inherit"],
-    env: { ...env, ...extra },
-  });
-  if (result.status !== 0) {
-    console.error(`\n${command} ${args[0]} failed (exit ${result.status})`);
-    process.exit(result.status ?? 1);
-  }
-}
+const productionEnv: NodeJS.ProcessEnv = { ...process.env };
+delete productionEnv.CLOUDFLARE_ENV;
+delete productionEnv.WRANGLER_ENV;
 
 // The build flattens the top-level config into dist/server/wrangler.json and
 // points Wrangler at it (.wrangler/deploy/config.json) for the deploy below.
-run("npx", ["vite", "build"]);
+run("npx", ["vite", "build"], productionEnv);
 
-// Migrations read the source config explicitly: the built config does not
-// carry migrations_dir.
-run("npx", [
-  "wrangler",
-  "d1",
-  "migrations",
-  "apply",
-  "DB",
-  "--remote",
-  "--config",
-  "wrangler.jsonc",
-]);
+run("npx", d1MigrateArgs(), productionEnv);
 
-const outputDir = mkdtempSync(path.join(tmpdir(), "production-deploy-"));
-const outputFile = path.join(outputDir, "wrangler-output.ndjson");
-try {
-  run("npx", ["wrangler", "deploy"], { WRANGLER_OUTPUT_FILE_PATH: outputFile });
-  console.log(productionUrlFrom(readFileSync(outputFile, "utf8")));
-} finally {
-  rmSync(outputDir, { recursive: true, force: true });
-}
+const output = captureWranglerOutput((outputEnv) =>
+  run("npx", ["wrangler", "deploy"], { ...productionEnv, ...outputEnv }),
+);
+console.log(productionUrlFrom(output));

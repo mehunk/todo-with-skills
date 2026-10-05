@@ -23,7 +23,7 @@ export default defineConfig(async () => {
       }),
     ],
     test: {
-      include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
+      include: ["src/**/*.test.ts", "scripts/**/*.test.ts", "e2e/**/*.test.ts"],
       setupFiles: ["./src/test/setup.ts"],
     },
   };

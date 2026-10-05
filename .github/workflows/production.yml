@@ -9,6 +9,8 @@ on:
 
 # One production deploy at a time. A running release is never cancelled
 # midway (it may be between migrating and deploying); a newer push waits.
+# GitHub keeps only the newest pending run: an older one still waiting is
+# cancelled, which is fine since the newest push carries its commits.
 concurrency:
   group: production
   cancel-in-progress: false
@@ -16,20 +18,15 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  NODE_VERSION: 24
-
 jobs:
+  # Named apart from pr.yml's `Checks` so the two never share a check name
+  # on the same commit.
   checks:
-    name: Checks
+    name: Release checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: Format and lint
         run: npm run check
       - name: Type check
@@ -48,11 +45,7 @@ jobs:
       url: ${{ steps.deploy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       # Build, migrate the `todo` D1, then deploy; a failed migration stops
       # the job before `wrangler deploy` runs.
       - name: Migrate production D1 and deploy
@@ -72,20 +65,18 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Run the smoke E2E against production
         env:
           BASE_URL: ${{ needs.deploy.outputs.url }}
+          # Production must not serve Storybook; e2e/no-storybook.spec.ts checks it.
+          E2E_NO_STORYBOOK: "1"
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
-        run: npm run e2e -- e2e/smoke.spec.ts
+        run: npm run e2e -- e2e/smoke.spec.ts e2e/no-storybook.spec.ts
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
-import { createTestData } from "./support/test-data";
+import { describe, expect, it } from "vitest";
+import { createTestData } from "./test-data";
 
-test.describe("test data helper", () => {
-  test("names are unique and carry the label", () => {
+describe("createTestData", () => {
+  it("makes unique names that carry the label", () => {
     const data = createTestData();
     const a = data.uniqueName("Groceries");
     const b = data.uniqueName("Groceries");
@@ -11,7 +11,7 @@ test.describe("test data helper", () => {
     expect(a).toMatch(/^e2e Groceries /);
   });
 
-  test("cleanup runs every registered step, newest first, even when one fails", async () => {
+  it("runs every cleanup step, newest first, even when one fails", async () => {
     const data = createTestData();
     const ran: string[] = [];
     data.onCleanup(async () => {

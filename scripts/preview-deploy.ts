@@ -9,66 +9,40 @@
  * `todo-preview` D1, then `wrangler versions upload --preview-alias`.
  * All tool output goes to stderr so stdout stays machine-readable.
  */
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import { captureWranglerOutput, run } from "./deploy-steps.ts";
+import { parsePreviewAlias } from "./preview-alias.ts";
 import { previewAliasUrlFrom } from "./preview-url.ts";
+import { d1MigrateArgs } from "./wrangler-commands.ts";
 
-const alias = process.argv[2];
-if (!alias) {
-  console.error("Usage: npm run preview:deploy -- <alias>   (e.g. pr-42)");
+let alias: string;
+try {
+  alias = parsePreviewAlias(process.argv[2]);
+} catch (error) {
+  console.error((error as Error).message);
   process.exit(1);
 }
 
-function run(command: string, args: string[], env: NodeJS.ProcessEnv = {}) {
-  console.error(`\n$ ${command} ${args.join(" ")}`);
-  const result = spawnSync(command, args, {
-    stdio: ["inherit", process.stderr, "inherit"],
-    env: { ...process.env, ...env },
-  });
-  if (result.status !== 0) {
-    console.error(`\n${command} ${args[0]} failed (exit ${result.status})`);
-    process.exit(result.status ?? 1);
-  }
-}
+const env = process.env;
 
 // The build flattens the `preview` environment into dist/server/wrangler.json
 // and points Wrangler at it (.wrangler/deploy/config.json), so the upload below
 // targets `todo-preview` without --env.
-run("npx", ["vite", "build"], { CLOUDFLARE_ENV: "preview" });
+run("npx", ["vite", "build"], { ...env, CLOUDFLARE_ENV: "preview" });
 
 // Previews also ship Storybook: built into the app's static assets directory
 // (dist/client, the built config's `assets.directory`) so the upload below
 // serves it at <preview URL>/storybook/. Storybook emits relative asset paths,
 // so the sub-path needs no base setting. Production deploys run `vite build`
 // alone, which empties dist/, so they never carry it.
-run("npx", [
-  "storybook",
-  "build",
-  "--output-dir",
-  "dist/client/storybook",
-  "--quiet",
-]);
+run(
+  "npx",
+  ["storybook", "build", "--output-dir", "dist/client/storybook", "--quiet"],
+  env,
+);
 
-// Migrations read the source config explicitly: the built config does not
-// carry migrations_dir.
-run("npx", [
-  "wrangler",
-  "d1",
-  "migrations",
-  "apply",
-  "DB",
-  "--remote",
-  "--env",
-  "preview",
-  "--config",
-  "wrangler.jsonc",
-]);
+run("npx", d1MigrateArgs("preview"), env);
 
-const outputDir = mkdtempSync(path.join(tmpdir(), "preview-deploy-"));
-const outputFile = path.join(outputDir, "wrangler-output.ndjson");
-try {
+const output = captureWranglerOutput((outputEnv) =>
   run(
     "npx",
     [
@@ -80,9 +54,7 @@ try {
       "--message",
       `Preview ${alias}`,
     ],
-    { WRANGLER_OUTPUT_FILE_PATH: outputFile },
-  );
-  console.log(previewAliasUrlFrom(readFileSync(outputFile, "utf8")));
-} finally {
-  rmSync(outputDir, { recursive: true, force: true });
-}
+    { ...env, ...outputEnv },
+  ),
+);
+console.log(previewAliasUrlFrom(output));

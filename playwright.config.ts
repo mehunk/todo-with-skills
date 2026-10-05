@@ -21,6 +21,8 @@ const baseURL = process.env.BASE_URL ?? `http://localhost:${LOCAL_PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Browser specs only: e2e/**/*.test.ts are Vitest unit tests of the helpers.
+  testMatch: "**/*.spec.ts",
   globalSetup: "./e2e/global.setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

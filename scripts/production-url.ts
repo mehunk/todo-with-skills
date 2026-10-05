@@ -1,15 +1,12 @@
+import { lastWranglerEntry } from "./wrangler-output.ts";
+
 /**
  * Reads the production workers.dev URL out of the ND-JSON file Wrangler writes
  * to WRANGLER_OUTPUT_FILE_PATH during `wrangler deploy`, so the smoke E2E runs
  * against the URL that was actually deployed.
  */
 export function productionUrlFrom(wranglerOutput: string): string {
-  const deploy = wranglerOutput
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => JSON.parse(line) as Record<string, unknown>)
-    .filter((entry) => entry.type === "deploy")
-    .at(-1);
+  const deploy = lastWranglerEntry(wranglerOutput, "deploy");
 
   if (!deploy) {
     throw new Error("Wrangler output has no deploy entry");
