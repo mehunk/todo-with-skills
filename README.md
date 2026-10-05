@@ -25,10 +25,9 @@ This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
 
 If you prefer not to use Tailwind CSS:
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+1. Replace the Tailwind import in `src/styles.css` with your own styles
+2. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
+3. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
 
 ## Linting & Formatting
 
@@ -86,14 +85,13 @@ KV, D1, R2, and Durable Object bindings are configured in `wrangler.jsonc` — s
    CLERK_SECRET_KEY=sk_test_...
    ```
 
-3. Start the app and visit `/demo/clerk`.
+3. Start the app and use the Sign in button in the header.
 
 ### What's wired up
 
 - `clerkMiddleware()` authenticates each server request from `src/start.ts`.
 - `<ClerkProvider>` supplies auth state throughout the app.
 - `<SignInButton>` and `<UserButton>` in the header respond to the session.
-- `/demo/clerk` shows Clerk's prebuilt sign-in UI and signed-in user data.
 
 ### Protecting a route
 
@@ -297,11 +295,6 @@ function PeopleComponent() {
 ```
 
 Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
 
 
 # Learn More
