@@ -11,3 +11,7 @@ Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `
 ### Domain docs
 
 Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## UI
+
+All UI work follows the design system in `docs/ui.md` (semantic shadcn tokens only, scarce use of `primary`, light + dark, Storybook stories for every presentational component state).
