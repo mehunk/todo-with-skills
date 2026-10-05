@@ -24,7 +24,8 @@
     "cf-typegen": "wrangler types",
     "e2e": "playwright test",
     "e2e:report": "playwright show-report",
-    "preview:deploy": "node scripts/preview-deploy.ts"
+    "preview:deploy": "node scripts/preview-deploy.ts",
+    "production:deploy": "node scripts/production-deploy.ts"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^1.4.21",
