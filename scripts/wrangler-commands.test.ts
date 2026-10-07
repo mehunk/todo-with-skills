@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   d1CreateArgs,
+  d1DeleteArgs,
   d1InfoArgs,
   d1ListArgs,
   d1MigrateArgs,
@@ -65,6 +66,18 @@ describe("d1CreateArgs", () => {
       "create",
       "todo-preview-pr-42",
       "--update-config=false",
+    ]);
+  });
+});
+
+describe("d1DeleteArgs", () => {
+  it("deletes one D1 database by name without a confirmation prompt", () => {
+    expect(d1DeleteArgs("todo-preview-pr-42")).toEqual([
+      "wrangler",
+      "d1",
+      "delete",
+      "todo-preview-pr-42",
+      "--skip-confirmation",
     ]);
   });
 });
