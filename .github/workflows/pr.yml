@@ -3,6 +3,8 @@
 # requests".
 #
 # Job names (`name:`) are what branch protection requires; keep them stable.
+# A closed PR is handled by pr-closed.yml, never here: the gate below runs on
+# `always()` and would fail on a close.
 name: PR
 
 on:
