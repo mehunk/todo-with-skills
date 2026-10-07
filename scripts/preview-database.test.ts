@@ -4,6 +4,7 @@ import {
   d1LimitMessage,
   findD1Database,
   isD1LimitError,
+  isD1NotFoundError,
   notOpenPrDatabases,
   previewDatabaseName,
   prPreviewDatabases,
@@ -245,6 +246,26 @@ describe("isD1LimitError", () => {
     "",
   ])("does not mistake %s for the limit", (output) => {
     expect(isD1LimitError(output)).toBe(false);
+  });
+});
+
+describe("isD1NotFoundError", () => {
+  it.each([
+    // Wrangler 4.147's lookup by name, when the database is gone.
+    "✘ [ERROR] Couldn't find a D1 DB with name or binding 'todo-preview-pr-42' in your config or the API. Run 'wrangler d1 create todo-preview-pr-42' to create it.",
+    // The DELETE itself, should the database vanish after the lookup.
+    "✘ [ERROR] A request to the Cloudflare API (/accounts/abc/d1/database/0f6e2c1a) failed.\n  The database 0f6e2c1a could not be found [code: 7404]",
+  ])("recognises %s", (output) => {
+    expect(isD1NotFoundError(output)).toBe(true);
+  });
+
+  it.each([
+    "✘ [ERROR] Authentication error [code: 10000]",
+    "✘ [ERROR] A request to the Cloudflare API failed.\n  Internal error [code: 7500]",
+    "✘ [ERROR] Couldn't find an account",
+    "",
+  ])("does not mistake %s for a missing database", (output) => {
+    expect(isD1NotFoundError(output)).toBe(false);
   });
 });
 

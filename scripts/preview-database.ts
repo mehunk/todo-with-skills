@@ -95,6 +95,19 @@ export function isD1LimitError(output: string): boolean {
 }
 
 /**
+ * Whether `d1 delete`'s output says the database does not exist, so a
+ * teardown racing another deletion still counts as done. Wrangler 4.147 looks
+ * the name up first ("Couldn't find a D1 DB with name or binding ..."); should
+ * the database vanish between that lookup and the delete, the API answers
+ * error 7404.
+ */
+export function isD1NotFoundError(output: string): boolean {
+  return (
+    /Couldn't find a D1 DB\b/.test(output) || /\bcode:\s*7404\b/.test(output)
+  );
+}
+
+/**
  * Why a deploy stopped at the D1 limit and how to recover, naming the PR
  * previews among `databases` that hold a slot. With the open PRs known
  * (`openPrs`), only open PRs' previews are named, so a database whose delete

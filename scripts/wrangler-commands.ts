@@ -58,7 +58,8 @@ export function d1CreateArgs(databaseName: string): string[] {
 /**
  * `npx` args deleting a D1 database without the confirmation prompt, so it
  * runs unattended in CI. Wrangler fails for a missing database, so teardown
- * looks the database up first and treats a missing one as already gone.
+ * looks the database up first, and treats a missing one, or a delete failing
+ * because it went missing meanwhile (`isD1NotFoundError`), as already gone.
  */
 export function d1DeleteArgs(databaseName: string): string[] {
   return ["wrangler", "d1", "delete", databaseName, "--skip-confirmation"];
