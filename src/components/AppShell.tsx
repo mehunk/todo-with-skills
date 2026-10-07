@@ -8,6 +8,7 @@ import {
   SheetTitle,
 } from "#/components/ui/sheet";
 import { cn } from "#/lib/utils";
+import { AppVersion } from "./AppVersion";
 
 const CloseDrawerContext = createContext<() => void>(() => {});
 
@@ -82,6 +83,7 @@ export function AppShell({
             <div className="flex flex-1 flex-col">{children}</div>
           </main>
         </div>
+        <AppVersion className="mx-auto mt-3 w-full max-w-6xl text-right" />
       </div>
     </CloseDrawerContext.Provider>
   );
