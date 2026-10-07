@@ -4,7 +4,7 @@ Each pull request preview runs against its own D1 database, `todo-preview-<alias
 
 ## Consequences
 
-The account is on Workers Free, which allows 10 D1 databases. With `todo` (and, until it is deleted, the old `todo-preview`) that leaves room for 8 or 9 open previews, so a PR's database must be deleted when the PR closes, and deploys clean up the databases of PRs already closed.
+The account is on Workers Free, which allows 10 D1 databases. With `todo` (and, until it is deleted, the old `todo-preview`) that leaves room for 8 or 9 open previews, so a PR's database must be deleted when the PR closes, and deploys clean up the databases of PRs that are not open. That cleanup accepts a narrow race: it can delete the database of a PR reopened moments after it listed the open PRs; that PR's next deploy recreates the database, empty.
 
 Migrations must still be additive (no dropping or renaming columns): production applies migrations before it deploys, so the old production code runs against the new schema for a moment.
 
