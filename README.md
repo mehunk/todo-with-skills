@@ -124,6 +124,14 @@ url=$(npm run -s preview:deploy -- pr-42)
 
 `scripts/preview-deploy.ts` first ensures the alias's own D1 database, `todo-preview-<alias>`, exists: it looks it up in `wrangler d1 list --json` and, if it is missing, creates it and reads its id back with `wrangler d1 info --json`. Re-runs, later pushes and reopened PRs reuse the database and its data. It then builds the app for the `preview` environment (`CLOUDFLARE_ENV=preview vite build`), rebinds `DB` in the built config (`dist/server/wrangler.json`) to that database, applies pending migrations to it through that config, and uploads a new version of `todo-preview` with `wrangler versions upload --preview-alias <alias>`, which carries that binding. A failed migration stops the deploy before the upload. Nothing migrates or binds the shared `todo-preview` database any more. The alias URL, `https://<alias>-todo-preview.personal-d9e.workers.dev`, is the only line it prints on stdout (all build and Wrangler output goes to stderr), so CI can capture it. The URL is read from Wrangler's machine-readable output file, not its console log. Aliases must be lowercase letters, digits and dashes, starting with a letter; the script rejects any other alias before building.
 
+To free a preview's database slot by hand (e.g. when the close job below did not run):
+
+```bash
+npm run -s preview:teardown -- <alias>   # e.g. pr-42
+```
+
+`scripts/preview-teardown.ts` validates the alias like the deploy does, looks `todo-preview-<alias>` up in `wrangler d1 list --json` and, if it exists, deletes it with `wrangler d1 delete --skip-confirmation`. A missing database counts as success, so running it twice, or for an alias that never deployed, is harmless. It prints nothing on stdout. The alias's Worker version stays, but its preview URL stops working once its database is gone; the next `preview:deploy` of that alias creates a fresh, empty database.
+
 #### First-time setup of `todo-preview`
 
 `versions upload` only works once the `todo-preview` Worker exists with its workers.dev and preview URLs turned on. On a fresh account, run these once (not part of CI):
@@ -166,6 +174,8 @@ The `secret put` value is the Clerk development instance's secret key (the same 
 | `Preview deploy` | after `Checks`, only for PRs from branches of this repo | `npm run -s preview:deploy -- pr-<N>` with the `preview` environment's secrets (creates or reuses the `todo-preview-pr-<N>` D1, builds the app and Storybook, migrates that D1, uploads alias `pr-<N>` bound to it), exposes the URL as the job output `url`, then posts or updates the PR's sticky preview comment |
 | `E2E` | after `Preview deploy` | `npm run e2e` with `BASE_URL` set to the preview URL and `E2E_STORYBOOK=1` (so `e2e/storybook.spec.ts` checks `/storybook/`); on failure uploads `playwright-report/` and `test-results/` as the `playwright-report` artifact |
 | `PR pipeline` | always, after all of the above | the gate: passes only if `Checks`, `Preview deploy` and `E2E` all succeeded; a skipped job counts as a failure |
+
+When a PR is closed, merged or not, `.github/workflows/pr-closed.yml` runs a single job, `Preview teardown`: `npm run -s preview:teardown -- pr-<N>` with the `preview` environment's secrets, from the base branch's code. It deletes the PR's `todo-preview-pr-<N>` D1, so a closed PR's preview URL stops working. It is skipped for fork PRs, and it is not a required check. It lives in its own workflow so that a close never runs `Checks`, `Preview deploy`, `E2E` or the `always()` gate. It shares `pr.yml`'s concurrency group (`pr-<N>`): closing cancels the PR's in-flight run, and reopening cancels a pending teardown. A reopened PR gets a working preview on its next deploy, which recreates the database if it was deleted.
 
 Branch protection on `main` requires two checks: `Checks` and `PR pipeline`. Require the gate rather than `Preview deploy`/`E2E` directly: GitHub reports a skipped job as passing, so a fork PR would otherwise satisfy the required checks without ever being deployed or tested.
 
