@@ -24,12 +24,15 @@
   // with `wrangler secret put CLERK_SECRET_KEY [--env preview]`.
   "env": {
     // Pull request previews (ADR-0003): a separate `todo-preview` Worker,
-    // deployed with `wrangler versions upload --preview-alias pr-<N>`, all
-    // sharing the `todo-preview` D1 database.
+    // deployed with `wrangler versions upload --preview-alias pr-<N>`. Each
+    // alias gets its own D1 database, `todo-preview-<alias>` (ADR-0004).
     "preview": {
       "name": "todo-preview",
       "workers_dev": true,
       "preview_urls": true,
+      // Build template only: `preview:deploy` replaces this binding per PR
+      // with the alias's own database before migrating and uploading. Nothing
+      // migrates or binds `todo-preview` any more.
       "d1_databases": [
         {
           "binding": "DB",

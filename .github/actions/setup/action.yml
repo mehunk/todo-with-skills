@@ -1,4 +1,4 @@
-# Node and dependencies for every job of pr.yml and production.yml.
+# Node and dependencies for every job of pr.yml, pr-closed.yml and production.yml.
 # A local action is read from the checked-out repo, so each job runs
 # `actions/checkout` itself first, then `uses: ./.github/actions/setup`.
 name: Setup
