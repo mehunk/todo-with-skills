@@ -51,6 +51,78 @@ export function runForOutput(
 }
 
 /**
+ * Runs `command` like `runForOutput`, but a failure (or a missing command)
+ * returns undefined instead of exiting, for optional steps the script can
+ * skip.
+ */
+export function tryRunForOutput(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): string | undefined {
+  console.error(`\n$ ${command} ${args.join(" ")}`);
+  const result = spawnSync(command, args, {
+    stdio: ["ignore", "pipe", "inherit"],
+    env,
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    process.stderr.write(result.stdout ?? "");
+    console.error(
+      `\n${command} ${args[0]} failed (${result.error?.message ?? `exit ${result.status}`})`,
+    );
+    return undefined;
+  }
+  return result.stdout;
+}
+
+/**
+ * Runs `command` like `run`, but returns whether it succeeded instead of
+ * exiting on failure, for steps whose failure the script handles itself.
+ */
+export function tryRun(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): boolean {
+  console.error(`\n$ ${command} ${args.join(" ")}`);
+  const result = spawnSync(command, args, {
+    stdio: ["inherit", process.stderr, "inherit"],
+    env,
+  });
+  if (result.status !== 0) {
+    console.error(`\n${command} ${args[0]} failed (exit ${result.status})`);
+  }
+  return result.status === 0;
+}
+
+/**
+ * Runs `command`, forwarding both its stdout and stderr to stderr, and
+ * returns its exit status with everything it printed, so a caller can tell
+ * one failure from another by its message.
+ */
+export function runCapturingOutput(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): { ok: boolean; output: string } {
+  console.error(`\n$ ${command} ${args.join(" ")}`);
+  const result = spawnSync(command, args, {
+    stdio: ["inherit", "pipe", "pipe"],
+    env,
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  process.stderr.write(output);
+  if (result.status !== 0) {
+    console.error(`\n${command} ${args[0]} failed (exit ${result.status})`);
+  }
+  return { ok: result.status === 0, output };
+}
+
+/**
  * Calls `step` with a temporary WRANGLER_OUTPUT_FILE_PATH, then returns the
  * ND-JSON Wrangler wrote there. The temporary directory is always removed.
  */
