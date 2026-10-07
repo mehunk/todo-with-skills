@@ -54,12 +54,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+      # GH_TOKEN lets the deploy list the open PRs (`gh pr list`) to delete
+      # the D1 databases of closed ones before ensuring its own.
       - name: Ensure and migrate the PR's D1, then upload preview
         id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           ALIAS: pr-${{ github.event.pull_request.number }}
         run: |
           url=$(npm run -s preview:deploy -- "$ALIAS")
