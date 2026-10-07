@@ -3,10 +3,14 @@
  * name it, find it in Wrangler's JSON output and bind it in the built config;
  * `preview-deploy.ts` runs the Wrangler commands around them.
  */
+import { prNumberOfAlias, prPreviewAlias } from "./preview-alias.ts";
+
+/** Every preview database's name is this prefix and the preview's alias. */
+const PREVIEW_DATABASE_PREFIX = "todo-preview-";
 
 /** The D1 database of preview `alias`: `pr-42` gives `todo-preview-pr-42`. */
 export function previewDatabaseName(alias: string): string {
-  return `todo-preview-${alias}`;
+  return `${PREVIEW_DATABASE_PREFIX}${alias}`;
 }
 
 /** A remote D1 database, as a binding needs it. */
@@ -41,20 +45,20 @@ export function findD1Database(
 /** A PR preview's database: `todo-preview-pr-<pr>`. */
 export type PrPreviewDatabase = { name: string; pr: number };
 
-const PR_PREVIEW_DATABASE = /^todo-preview-pr-([1-9][0-9]*)$/;
-
 /**
  * The databases in `wrangler d1 list --json` output named exactly like a PR
  * preview's (`todo-preview-pr-<N>`): the only candidates for cleanup. The
- * pattern is anchored, so production's `todo`, the old shared `todo-preview`
- * and any other preview alias's database never match.
+ * whole name must be the prefix followed by a PR's alias, so production's
+ * `todo`, the old shared `todo-preview` and any other preview alias's
+ * database never match.
  */
 export function prPreviewDatabases(listing: string): PrPreviewDatabase[] {
-  return (JSON.parse(listing) as WranglerD1Entry[]).flatMap((database) => {
-    const match =
-      typeof database.name === "string" &&
-      PR_PREVIEW_DATABASE.exec(database.name);
-    return match ? [{ name: match[0], pr: Number(match[1]) }] : [];
+  return (JSON.parse(listing) as WranglerD1Entry[]).flatMap(({ name }) => {
+    if (typeof name !== "string" || !name.startsWith(PREVIEW_DATABASE_PREFIX)) {
+      return [];
+    }
+    const pr = prNumberOfAlias(name.slice(PREVIEW_DATABASE_PREFIX.length));
+    return pr === undefined ? [] : [{ name, pr }];
   });
 }
 
@@ -97,7 +101,7 @@ export function d1LimitMessage(open: PrPreviewDatabase[]): string {
   const previews =
     [...open]
       .sort((a, b) => a.pr - b.pr)
-      .map((database) => `pr-${database.pr}`)
+      .map((database) => prPreviewAlias(database.pr))
       .join(", ") || "none";
   return `D1 database limit reached (open previews: ${previews}). Close a PR (its database is deleted on close), then use "Re-run failed jobs" on this PR.`;
 }

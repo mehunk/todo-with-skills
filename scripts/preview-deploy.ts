@@ -26,7 +26,7 @@ import {
   tryRunForOutput,
 } from "./deploy-steps.ts";
 import { openPrListArgs, openPrNumbers } from "./open-pull-requests.ts";
-import { parsePreviewAlias } from "./preview-alias.ts";
+import { parsePreviewAlias, prNumberOfAlias } from "./preview-alias.ts";
 import {
   closedPrDatabases,
   type D1Database,
@@ -59,8 +59,12 @@ try {
 
 const env = process.env;
 
+// The PR this deploy previews, when its alias is a PR's (`pr-<N>`).
+const ownPr = prNumberOfAlias(alias);
+
 // The open PR numbers, from one `gh` call, or undefined when GitHub cannot be
 // asked (no gh, no `gh auth login` or GH_TOKEN, an API error). Never prompts.
+// This deploy's own PR always counts as open, even if GitHub lags behind.
 function openPullRequests(): ReadonlySet<number> | undefined {
   const output = tryRunForOutput("gh", openPrListArgs(), {
     ...env,
@@ -68,7 +72,9 @@ function openPullRequests(): ReadonlySet<number> | undefined {
   });
   if (output === undefined) return undefined;
   try {
-    return openPrNumbers(output);
+    const open = openPrNumbers(output);
+    if (ownPr !== undefined) open.add(ownPr);
+    return open;
   } catch (error) {
     console.error((error as Error).message);
     return undefined;
@@ -90,10 +96,7 @@ function deleteClosedPrDatabases(listing: string): PrPreviewDatabase[] {
     );
     return databases;
   }
-  const openPrs = new Set(open);
-  const ownPr = /^pr-([1-9][0-9]*)$/.exec(alias)?.[1];
-  if (ownPr) openPrs.add(Number(ownPr));
-  const closed = closedPrDatabases(databases, openPrs);
+  const closed = closedPrDatabases(databases, open);
   if (closed.length === 0) {
     console.error("No closed PRs' preview databases to delete");
   }
