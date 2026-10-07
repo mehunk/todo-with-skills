@@ -44,9 +44,9 @@ npm run typecheck  # tsc --noEmit
 
 ## Database (D1 + Drizzle)
 
-Data lives in Cloudflare D1, bound as `DB` in `wrangler.jsonc` and accessed through Drizzle (`createDb(env.DB)` from `src/db`, with `env` from `cloudflare:workers` in server code). Production binds the remote `todo` database and the `preview` environment binds `todo-preview`; `npm run dev` and the tests only ever use the local copy (stored under `.wrangler/state`).
+Data lives in Cloudflare D1, bound as `DB` in `wrangler.jsonc` and accessed through Drizzle (`createDb(env.DB)` from `src/db`, with `env` from `cloudflare:workers` in server code). Production binds the remote `todo` database. Each preview binds its own database, `todo-preview-<alias>` (e.g. `todo-preview-pr-42`), which `preview:deploy` creates on the first deploy and reuses afterwards; the `preview` environment's `todo-preview` binding is only a build template (see `docs/adr/0004-per-preview-d1-database.md`). `npm run dev` and the tests only ever use the local copy (stored under `.wrangler/state`).
 
-Schema changes are versioned migrations, never edited by hand once applied, and must be additive (see `docs/adr/0003-separate-preview-worker.md`):
+Schema changes are versioned migrations, never edited by hand once applied, and must be additive, because production applies them before deploying the new code (see `docs/adr/0004-per-preview-d1-database.md`):
 
 1. Change the Drizzle schema in `src/db/schema.ts`.
 2. Generate a migration into `migrations/`: `npm run db:generate`
@@ -101,12 +101,12 @@ Global setup (`e2e/global.setup.ts`) calls `clerkSetup()` from `@clerk/testing` 
 
 ## Deploy to Cloudflare Workers
 
-This project uses the Cloudflare Vite plugin (configured in `vite.config.ts`) and `wrangler.jsonc`, which has two environments in the "Personal" Cloudflare account (see `docs/adr/0003-separate-preview-worker.md`):
+This project uses the Cloudflare Vite plugin (configured in `vite.config.ts`) and `wrangler.jsonc`, which has two environments in the "Personal" Cloudflare account (see `docs/adr/0003-separate-preview-worker.md` and `docs/adr/0004-per-preview-d1-database.md`):
 
 | Environment | Worker | D1 database |
 | --- | --- | --- |
 | production (top level) | `todo` | `todo` |
-| `preview` | `todo-preview` | `todo-preview` |
+| `preview` | `todo-preview` | one per alias: `todo-preview-<alias>`, e.g. `todo-preview-pr-42` (the config's `todo-preview` binding is only a build template) |
 
 Clerk keys: `VITE_CLERK_PUBLISHABLE_KEY` must be set when building (Vite reads it from the shell or `.env.local` and inlines it); `CLERK_SECRET_KEY` is a Worker secret, set once per environment (it prompts for the value):
 
@@ -122,7 +122,7 @@ npm run preview:deploy -- <alias>   # e.g. pr-42
 url=$(npm run -s preview:deploy -- pr-42)
 ```
 
-`scripts/preview-deploy.ts` builds the app for the `preview` environment (`CLOUDFLARE_ENV=preview vite build`), applies pending migrations to the remote `todo-preview` D1, and uploads a new version of `todo-preview` with `wrangler versions upload --preview-alias <alias>`. The alias URL, `https://<alias>-todo-preview.personal-d9e.workers.dev`, is the only line it prints on stdout (all build and Wrangler output goes to stderr), so CI can capture it. The URL is read from Wrangler's machine-readable output file, not its console log. Aliases must be lowercase letters, digits and dashes, starting with a letter; the script rejects any other alias before building.
+`scripts/preview-deploy.ts` first ensures the alias's own D1 database, `todo-preview-<alias>`, exists: it looks it up in `wrangler d1 list --json` and, if it is missing, creates it and reads its id back with `wrangler d1 info --json`. Re-runs, later pushes and reopened PRs reuse the database and its data. It then builds the app for the `preview` environment (`CLOUDFLARE_ENV=preview vite build`), rebinds `DB` in the built config (`dist/server/wrangler.json`) to that database, applies pending migrations to it through that config, and uploads a new version of `todo-preview` with `wrangler versions upload --preview-alias <alias>`, which carries that binding. A failed migration stops the deploy before the upload. Nothing migrates or binds the shared `todo-preview` database any more. The alias URL, `https://<alias>-todo-preview.personal-d9e.workers.dev`, is the only line it prints on stdout (all build and Wrangler output goes to stderr), so CI can capture it. The URL is read from Wrangler's machine-readable output file, not its console log. Aliases must be lowercase letters, digits and dashes, starting with a letter; the script rejects any other alias before building.
 
 #### First-time setup of `todo-preview`
 
@@ -163,7 +163,7 @@ The `secret put` value is the Clerk development instance's secret key (the same 
 | Job | Runs | What it does |
 | --- | --- | --- |
 | `Checks` | every PR, forks included, no secrets | `npm run check` (Biome format + lint), `npm run typecheck`, `npm test`, `npm run build`, `npm run build-storybook` |
-| `Preview deploy` | after `Checks`, only for PRs from branches of this repo | `npm run -s preview:deploy -- pr-<N>` with the `preview` environment's secrets (builds the app and Storybook, migrates the `todo-preview` D1, uploads alias `pr-<N>`), exposes the URL as the job output `url`, then posts or updates the PR's sticky preview comment |
+| `Preview deploy` | after `Checks`, only for PRs from branches of this repo | `npm run -s preview:deploy -- pr-<N>` with the `preview` environment's secrets (creates or reuses the `todo-preview-pr-<N>` D1, builds the app and Storybook, migrates that D1, uploads alias `pr-<N>` bound to it), exposes the URL as the job output `url`, then posts or updates the PR's sticky preview comment |
 | `E2E` | after `Preview deploy` | `npm run e2e` with `BASE_URL` set to the preview URL and `E2E_STORYBOOK=1` (so `e2e/storybook.spec.ts` checks `/storybook/`); on failure uploads `playwright-report/` and `test-results/` as the `playwright-report` artifact |
 | `PR pipeline` | always, after all of the above | the gate: passes only if `Checks`, `Preview deploy` and `E2E` all succeeded; a skipped job counts as a failure |
 
