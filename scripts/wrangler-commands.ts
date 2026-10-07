@@ -1,19 +1,27 @@
 /**
- * `npx` args applying pending migrations to the production `todo` D1 (the
- * top-level config). They read the source config explicitly, so a leftover
- * built preview config is never used.
+ * `npx` args applying pending migrations to the remote D1 `database` (a
+ * binding or database name) as configured in the config file `configPath`.
  */
-export function d1MigrateArgs(): string[] {
+function remoteD1MigrateArgs(database: string, configPath: string): string[] {
   return [
     "wrangler",
     "d1",
     "migrations",
     "apply",
-    "DB",
+    database,
     "--remote",
     "--config",
-    "wrangler.jsonc",
+    configPath,
   ];
+}
+
+/**
+ * `npx` args applying pending migrations to the production `todo` D1 (the
+ * top-level config). They read the source config explicitly, so a leftover
+ * built preview config is never used.
+ */
+export function d1MigrateArgs(): string[] {
+  return remoteD1MigrateArgs("DB", "wrangler.jsonc");
 }
 
 /**
@@ -25,16 +33,7 @@ export function previewD1MigrateArgs(
   databaseName: string,
   configPath: string,
 ): string[] {
-  return [
-    "wrangler",
-    "d1",
-    "migrations",
-    "apply",
-    databaseName,
-    "--remote",
-    "--config",
-    configPath,
-  ];
+  return remoteD1MigrateArgs(databaseName, configPath);
 }
 
 /** `npx` args listing the account's D1 databases as JSON on stdout. */
