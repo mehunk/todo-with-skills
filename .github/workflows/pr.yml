@@ -1,0 +1,123 @@
+# Pull request pipeline: static checks, then a preview deploy and the
+# Playwright suite against that preview, then a gate. See README "CI on pull
+# requests".
+#
+# Job names (`name:`) are what branch protection requires; keep them stable.
+name: PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# A new push to the PR cancels its in-flight run.
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - name: Format and lint
+        run: npm run check
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Build Storybook
+        run: npm run build-storybook -- --quiet
+
+  # Secrets only reach PRs from branches of this repository, never forks.
+  deploy-preview:
+    name: Preview deploy
+    needs: checks
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - name: Migrate preview D1 and upload preview
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          ALIAS: pr-${{ github.event.pull_request.number }}
+        run: |
+          url=$(npm run -s preview:deploy -- "$ALIAS")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Post preview comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        run: >-
+          node scripts/post-preview-comment.ts "$PR_NUMBER" "$HEAD_SHA"
+          "App=$PREVIEW_URL" "Storybook=$PREVIEW_URL/storybook/"
+
+  e2e:
+    name: E2E
+    needs: deploy-preview
+    runs-on: ubuntu-latest
+    environment: preview
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E against the preview
+        env:
+          BASE_URL: ${{ needs.deploy-preview.outputs.url }}
+          # Previews ship Storybook at /storybook/; e2e/storybook.spec.ts checks it.
+          E2E_STORYBOOK: "1"
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+        run: npm run e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  # The required check that stands for the whole pipeline. A skipped job
+  # reports as passing to branch protection, so a fork PR (deploy and E2E
+  # skipped) would otherwise go green untested. This gate always runs and
+  # passes only when every job above succeeded; a skip counts as a failure.
+  gate:
+    name: PR pipeline
+    needs: [checks, deploy-preview, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to have succeeded
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "Job results: $RESULTS"
+          if [ "$(echo "$RESULTS" | jq 'all(. == "success")')" != "true" ]; then
+            echo "::error::Every PR job must succeed (skipped counts as failed). Fork PRs: a maintainer re-pushes the branch to this repository."
+            exit 1
+          fi

@@ -13,14 +13,18 @@
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
-    "deploy": "npm run build && wrangler deploy",
+    "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "e2e": "playwright test",
+    "e2e:report": "playwright show-report",
+    "preview:deploy": "node scripts/preview-deploy.ts",
+    "production:deploy": "node scripts/production-deploy.ts"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^1.4.21",
@@ -50,8 +54,10 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
+    "@clerk/testing": "^2.2.42",
     "@cloudflare/vite-plugin": "^1.26.0",
     "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@playwright/test": "^1.63.0",
     "@storybook/addon-themes": "^10.6.1",
     "@storybook/react-vite": "^10.6.1",
     "@tailwindcss/typography": "^0.5.16",

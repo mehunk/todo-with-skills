@@ -58,6 +58,7 @@ Refer to issues by their Linear identifier (`<TEAM>-<n>`).
 
 - PR title: the spec's project name. PR body (written with `/pr`): link the Spec document and list every ticket identifier (e.g. `Fixes TOD-6`, `Fixes TOD-7`) so Linear's GitHub integration moves them to Done on merge.
 - A human reviews the PR (and its preview, once the Delivery pipeline exists) and merges it. Agents never merge to `main`.
+- `main` is protected by the "Protect main" ruleset: changes land only through a pull request whose `Checks` and `PR pipeline` checks are green and whose branch is up to date with `main`. Direct pushes, force pushes and deleting `main` are blocked. Repo admins can bypass in an emergency.
 - After merge, set the spec's Project to `completed` if every ticket is Done or Canceled.
 
 ## Pull requests as a triage surface
