@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  closedPrDatabases,
   d1DatabaseFromInfo,
   d1LimitMessage,
   findD1Database,
   isD1LimitError,
+  notOpenPrDatabases,
   previewDatabaseName,
   prPreviewDatabases,
   withPreviewDatabase,
@@ -187,7 +187,7 @@ describe("prPreviewDatabases", () => {
   });
 });
 
-describe("closedPrDatabases", () => {
+describe("notOpenPrDatabases", () => {
   const listing = JSON.stringify(
     [
       "todo",
@@ -201,7 +201,7 @@ describe("closedPrDatabases", () => {
 
   it("chooses the databases of PRs not in the open set", () => {
     expect(
-      closedPrDatabases(prPreviewDatabases(listing), new Set([4])),
+      notOpenPrDatabases(prPreviewDatabases(listing), new Set([4])),
     ).toEqual([
       { name: "todo-preview-pr-3", pr: 3 },
       { name: "todo-preview-pr-12", pr: 12 },
@@ -210,12 +210,12 @@ describe("closedPrDatabases", () => {
 
   it("leaves every open PR's database alone", () => {
     expect(
-      closedPrDatabases(prPreviewDatabases(listing), new Set([3, 4, 12, 99])),
+      notOpenPrDatabases(prPreviewDatabases(listing), new Set([3, 4, 12, 99])),
     ).toEqual([]);
   });
 
   it("never chooses todo, todo-preview or a non-PR preview's database", () => {
-    const chosen = closedPrDatabases(prPreviewDatabases(listing), new Set());
+    const chosen = notOpenPrDatabases(prPreviewDatabases(listing), new Set());
     expect(chosen.map((database) => database.name)).toEqual([
       "todo-preview-pr-3",
       "todo-preview-pr-4",
@@ -249,21 +249,36 @@ describe("isD1LimitError", () => {
 });
 
 describe("d1LimitMessage", () => {
+  const databases = [
+    { name: "todo-preview-pr-15", pr: 15 },
+    { name: "todo-preview-pr-12", pr: 12 },
+    { name: "todo-preview-pr-9", pr: 9 },
+    { name: "todo-preview-pr-4", pr: 4 },
+  ];
+  const recovery =
+    'Close a PR (its database is deleted on close), then use "Re-run failed jobs" on this PR.';
+
   it("names the open previews holding databases, in PR order, and the recovery", () => {
-    expect(
-      d1LimitMessage([
-        { name: "todo-preview-pr-15", pr: 15 },
-        { name: "todo-preview-pr-12", pr: 12 },
-        { name: "todo-preview-pr-4", pr: 4 },
-      ]),
-    ).toBe(
-      'D1 database limit reached (open previews: pr-4, pr-12, pr-15). Close a PR (its database is deleted on close), then use "Re-run failed jobs" on this PR.',
+    expect(d1LimitMessage(databases, new Set([4, 12, 15, 99]))).toBe(
+      `D1 database limit reached (open previews: pr-4, pr-12, pr-15). ${recovery}`,
     );
   });
 
-  it("says so when no preview holds a database", () => {
-    expect(d1LimitMessage([])).toBe(
-      'D1 database limit reached (open previews: none). Close a PR (its database is deleted on close), then use "Re-run failed jobs" on this PR.',
+  it("leaves out the databases of PRs not known to be open, e.g. a failed delete", () => {
+    expect(d1LimitMessage(databases, new Set([12]))).toBe(
+      `D1 database limit reached (open previews: pr-12). ${recovery}`,
+    );
+  });
+
+  it("says so when no open preview holds a database", () => {
+    expect(d1LimitMessage([], new Set([3]))).toBe(
+      `D1 database limit reached (open previews: none). ${recovery}`,
+    );
+  });
+
+  it("names every PR preview database, not open previews, when the open PRs are unknown", () => {
+    expect(d1LimitMessage(databases, undefined)).toBe(
+      `D1 database limit reached (preview databases: pr-4, pr-9, pr-12, pr-15). ${recovery}`,
     );
   });
 });

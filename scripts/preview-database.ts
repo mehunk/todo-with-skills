@@ -64,10 +64,11 @@ export function prPreviewDatabases(listing: string): PrPreviewDatabase[] {
 
 /**
  * The PR preview databases to delete before a deploy: those whose PR is not in
- * `openPrs`. Only call this with the open set from a successful lookup; an
- * unknown PR state must never count as closed.
+ * `openPrs`, whether it is closed or no PR at all (e.g. a hand-run
+ * `pr-9999`). Only call this with the open set from a successful lookup; an
+ * unknown PR state must never count as not open.
  */
-export function closedPrDatabases(
+export function notOpenPrDatabases(
   databases: PrPreviewDatabase[],
   openPrs: ReadonlySet<number>,
 ): PrPreviewDatabase[] {
@@ -94,16 +95,27 @@ export function isD1LimitError(output: string): boolean {
 }
 
 /**
- * Why a deploy stopped at the D1 limit and how to recover: `open` are the PR
- * previews still holding a database once closed PRs' are cleaned up.
+ * Why a deploy stopped at the D1 limit and how to recover, naming the PR
+ * previews among `databases` that hold a slot. With the open PRs known
+ * (`openPrs`), only open PRs' previews are named, so a database whose delete
+ * failed is never passed off as an open preview; with them unknown, every PR
+ * preview database is named as just that.
  */
-export function d1LimitMessage(open: PrPreviewDatabase[]): string {
+export function d1LimitMessage(
+  databases: PrPreviewDatabase[],
+  openPrs: ReadonlySet<number> | undefined,
+): string {
+  const named = openPrs
+    ? databases.filter((database) => openPrs.has(database.pr))
+    : databases;
   const previews =
-    [...open]
-      .sort((a, b) => a.pr - b.pr)
-      .map((database) => prPreviewAlias(database.pr))
+    named
+      .map((database) => database.pr)
+      .sort((a, b) => a - b)
+      .map(prPreviewAlias)
       .join(", ") || "none";
-  return `D1 database limit reached (open previews: ${previews}). Close a PR (its database is deleted on close), then use "Re-run failed jobs" on this PR.`;
+  const label = openPrs ? "open previews" : "preview databases";
+  return `D1 database limit reached (${label}: ${previews}). Close a PR (its database is deleted on close), then use "Re-run failed jobs" on this PR.`;
 }
 
 /**

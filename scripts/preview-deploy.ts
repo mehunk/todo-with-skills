@@ -5,11 +5,11 @@
  *
  *   url=$(npm run -s preview:deploy -- pr-42)
  *
- * Steps: delete the D1 databases of PRs already closed (looked up with `gh`;
- * skipped with a note when GitHub cannot be asked, e.g. locally without auth);
- * ensure the preview's D1 (`todo-preview-<alias>`) exists, creating it on the
- * first deploy, or fail naming the open previews if the account is at its D1
- * limit; build for the `preview` Wrangler environment; build
+ * Steps: delete the D1 databases of PRs that are not open (looked up with
+ * `gh`; skipped with a note when GitHub cannot be asked, e.g. locally without
+ * auth); ensure the preview's D1 (`todo-preview-<alias>`) exists, creating it
+ * on the first deploy, or fail naming the open previews if the account is at
+ * its D1 limit; build for the `preview` Wrangler environment; build
  * Storybook into the static assets (served at /storybook/); bind the built
  * config's DB to the preview's D1; apply pending migrations to it; then
  * `wrangler versions upload --preview-alias`. A failed step stops the deploy,
@@ -28,12 +28,12 @@ import {
 import { openPrListArgs, openPrNumbers } from "./open-pull-requests.ts";
 import { parsePreviewAlias, prNumberOfAlias } from "./preview-alias.ts";
 import {
-  closedPrDatabases,
   type D1Database,
   d1DatabaseFromInfo,
   d1LimitMessage,
   findD1Database,
   isD1LimitError,
+  notOpenPrDatabases,
   type PrPreviewDatabase,
   previewDatabaseName,
   prPreviewDatabases,
@@ -82,30 +82,24 @@ function openPullRequests(): ReadonlySet<number> | undefined {
 }
 
 // The account's D1 slots are few (ADR-0004), so before ensuring its own
-// database a deploy deletes those of PRs already closed (a missed or failed
-// teardown). Only `todo-preview-pr-<N>` databases are candidates, and only
-// once GitHub has said which PRs are open: an unknown state never counts as
-// closed. This deploy's own PR always counts as open. A failed delete is
-// reported and skipped. Returns the PR preview databases left in place.
-function deleteClosedPrDatabases(listing: string): PrPreviewDatabase[] {
-  const databases = prPreviewDatabases(listing);
-  const open = openPullRequests();
-  if (open === undefined) {
-    console.error(
-      "Skipping cleanup of closed PRs' preview databases: could not list open PRs with gh (needs GH_TOKEN or `gh auth login`)",
-    );
-    return databases;
+// database a deploy deletes the `todo-preview-pr-<N>` databases of PRs that
+// are not open: closed ones (a missed or failed teardown) and numbers that
+// are no PR at all (e.g. a hand-run `pr-9999`). It only runs once GitHub has
+// said which PRs are open (`open`), so an unknown state never counts as not
+// open; this deploy's own PR is in `open`. A failed delete is reported and
+// skipped.
+function deleteNotOpenPrDatabases(
+  databases: PrPreviewDatabase[],
+  open: ReadonlySet<number>,
+) {
+  const notOpen = notOpenPrDatabases(databases, open);
+  if (notOpen.length === 0) {
+    console.error("No preview databases of PRs that are not open to delete");
   }
-  const closed = closedPrDatabases(databases, open);
-  if (closed.length === 0) {
-    console.error("No closed PRs' preview databases to delete");
-  }
-  const deleted = new Set<string>();
-  for (const database of closed) {
+  for (const database of notOpen) {
     if (tryRun("npx", d1DeleteArgs(database.name), env)) {
-      deleted.add(database.name);
       console.error(
-        `Deleted D1 database ${database.name} (PR #${database.pr} is closed)`,
+        `Deleted D1 database ${database.name} (PR #${database.pr} is not open)`,
       );
     } else {
       console.error(
@@ -113,7 +107,6 @@ function deleteClosedPrDatabases(listing: string): PrPreviewDatabase[] {
       );
     }
   }
-  return databases.filter((database) => !deleted.has(database.name));
 }
 
 // Idempotent: a re-run, a later push or a reopened PR reuses the database (and
@@ -121,7 +114,15 @@ function deleteClosedPrDatabases(listing: string): PrPreviewDatabase[] {
 // failure, the account's database limit included, stops the deploy early.
 function ensurePreviewDatabase(name: string): D1Database {
   const listing = runForOutput("npx", d1ListArgs(), env);
-  const remaining = deleteClosedPrDatabases(listing);
+  const prDatabases = prPreviewDatabases(listing);
+  const open = openPullRequests();
+  if (open) {
+    deleteNotOpenPrDatabases(prDatabases, open);
+  } else {
+    console.error(
+      "Skipping cleanup of preview databases of PRs that are not open: could not list open PRs with gh (needs GH_TOKEN or `gh auth login`)",
+    );
+  }
   const existing = findD1Database(listing, name);
   if (existing) {
     console.error(`Reusing D1 database ${name} (${existing.id})`);
@@ -130,7 +131,7 @@ function ensurePreviewDatabase(name: string): D1Database {
   const created = runCapturingOutput("npx", d1CreateArgs(name), env);
   if (!created.ok) {
     if (isD1LimitError(created.output)) {
-      console.error(`\n${d1LimitMessage(remaining)}`);
+      console.error(`\n${d1LimitMessage(prDatabases, open)}`);
     }
     process.exit(1);
   }
