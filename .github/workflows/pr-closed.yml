@@ -31,12 +31,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: preview
     steps:
-      # The base branch's code, not the PR's: the PR's merge ref may no longer
-      # exist once it is closed, and the base has the teardown script once this
-      # workflow has landed there.
+      # The default branch's code, never the PR's: trusted code that has the
+      # teardown script once this workflow has landed there. Not the PR's base
+      # branch, which for a stacked or spec PR may predate the script, and not
+      # the PR's merge ref, which may no longer exist once it is closed.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ github.event.repository.default_branch }}
       - uses: ./.github/actions/setup
       - name: Delete the PR's D1
         env:
