@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  closedPrDatabases,
   d1DatabaseFromInfo,
+  d1LimitMessage,
   findD1Database,
+  isD1LimitError,
   previewDatabaseName,
+  prPreviewDatabases,
   withPreviewDatabase,
 } from "./preview-database.ts";
 
@@ -139,5 +143,127 @@ describe("withPreviewDatabase", () => {
     expect(() =>
       withPreviewDatabase({ name: "todo-preview", d1_databases: [] }, database),
     ).toThrow(/no D1 binding "DB"/);
+  });
+});
+
+describe("prPreviewDatabases", () => {
+  const names = (...databaseNames: string[]) =>
+    JSON.stringify(databaseNames.map((name, i) => ({ uuid: `id-${i}`, name })));
+
+  it("selects the databases named like a PR preview's, with their PR number", () => {
+    expect(
+      prPreviewDatabases(
+        names(
+          "todo",
+          "todo-preview",
+          "todo-preview-pr-4",
+          "todo-preview-pr-12",
+        ),
+      ),
+    ).toEqual([
+      { name: "todo-preview-pr-4", pr: 4 },
+      { name: "todo-preview-pr-12", pr: 12 },
+    ]);
+  });
+
+  it.each([
+    "todo",
+    "todo-preview",
+    "todo-preview-pr",
+    "todo-preview-pr-",
+    "todo-preview-pr-0",
+    "todo-preview-pr-07",
+    "todo-preview-pr-4-old",
+    "todo-preview-pr-x",
+    "todo-preview-spike-2",
+    "other-todo-preview-pr-4",
+    "TODO-PREVIEW-PR-4",
+  ])("never selects %s", (name) => {
+    expect(prPreviewDatabases(names(name))).toEqual([]);
+  });
+
+  it("selects nothing in an empty account", () => {
+    expect(prPreviewDatabases("[]")).toEqual([]);
+  });
+});
+
+describe("closedPrDatabases", () => {
+  const listing = JSON.stringify(
+    [
+      "todo",
+      "todo-preview",
+      "todo-preview-pr-3",
+      "todo-preview-pr-4",
+      "todo-preview-pr-12",
+      "todo-preview-spike-2",
+    ].map((name, i) => ({ uuid: `id-${i}`, name })),
+  );
+
+  it("chooses the databases of PRs not in the open set", () => {
+    expect(
+      closedPrDatabases(prPreviewDatabases(listing), new Set([4])),
+    ).toEqual([
+      { name: "todo-preview-pr-3", pr: 3 },
+      { name: "todo-preview-pr-12", pr: 12 },
+    ]);
+  });
+
+  it("leaves every open PR's database alone", () => {
+    expect(
+      closedPrDatabases(prPreviewDatabases(listing), new Set([3, 4, 12, 99])),
+    ).toEqual([]);
+  });
+
+  it("never chooses todo, todo-preview or a non-PR preview's database", () => {
+    const chosen = closedPrDatabases(prPreviewDatabases(listing), new Set());
+    expect(chosen.map((database) => database.name)).toEqual([
+      "todo-preview-pr-3",
+      "todo-preview-pr-4",
+      "todo-preview-pr-12",
+    ]);
+  });
+});
+
+describe("isD1LimitError", () => {
+  it.each([
+    // Wrangler 4.147's message for Cloudflare API error 7406.
+    `✘ [ERROR] You have reached the maximum number of D1 databases for your account.
+
+  On the Workers Free plan? Upgrade to create more:
+  https://dash.cloudflare.com/abc/workers/plans`,
+    // The raw API error, should Wrangler stop rewording it.
+    "✘ [ERROR] A request to the Cloudflare API (/accounts/abc/d1/database) failed.\n  Database limit exceeded [code: 7406]",
+    "Error: account has hit its D1 database limit",
+  ])("recognises %s", (output) => {
+    expect(isD1LimitError(output)).toBe(true);
+  });
+
+  it.each([
+    "✘ [ERROR] A database with that name already exists",
+    "✘ [ERROR] Authentication error [code: 10000]",
+    "✘ [ERROR] Rate limit exceeded, retry later [code: 971]",
+    "",
+  ])("does not mistake %s for the limit", (output) => {
+    expect(isD1LimitError(output)).toBe(false);
+  });
+});
+
+describe("d1LimitMessage", () => {
+  it("names the open previews holding databases, in PR order, and the recovery", () => {
+    expect(
+      d1LimitMessage([
+        { name: "todo-preview-pr-15", pr: 15 },
+        { name: "todo-preview-pr-12", pr: 12 },
+        { name: "todo-preview-pr-4", pr: 4 },
+      ]),
+    ).toBe(
+      'D1 database limit reached (open previews: pr-4, pr-12, pr-15). Close a PR (its database is deleted on close), then use "Re-run failed jobs" on this PR.',
+    );
+  });
+
+  it("says so when no preview holds a database", () => {
+    expect(d1LimitMessage([])).toBe(
+      'D1 database limit reached (open previews: none). Close a PR (its database is deleted on close), then use "Re-run failed jobs" on this PR.',
+    );
   });
 });
