@@ -1,5 +1,7 @@
 # Previews run on a separate Worker, not Worker Previews
 
+> Partly superseded by ADR-0004: each preview now gets its own D1 database, so previews no longer share one. The additive-migrations rule stands, for the reason ADR-0004 gives.
+
 Each pull request is deployed to a separate `todo-preview` Worker (a Wrangler `preview` environment) with `wrangler versions upload --preview-alias pr-<N>`, bound to one shared preview D1 database. We considered Cloudflare Worker Previews (`wrangler preview`), but in October 2026 it was in open beta with bugs affecting this app (broken `--json` output for Workers with static assets, secrets dropped on redeploy), and running previews on the production Worker would let the CI token used by pull requests overwrite production. A separate Worker keeps production out of reach of preview CI.
 
 ## Consequences

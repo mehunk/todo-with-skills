@@ -52,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - name: Migrate preview D1 and upload preview
+      - name: Ensure and migrate the PR's D1, then upload preview
         id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
