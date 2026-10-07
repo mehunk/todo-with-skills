@@ -10,7 +10,7 @@
  * of the same alias creates a fresh database. Prints nothing on stdout; all
  * tool output goes to stderr.
  */
-import { run, runForOutput } from "./deploy-steps.ts";
+import { run } from "./deploy-steps.ts";
 import { parsePreviewAlias } from "./preview-alias.ts";
 import { findD1Database, previewDatabaseName } from "./preview-database.ts";
 import { d1DeleteArgs, d1ListArgs } from "./wrangler-commands.ts";
@@ -26,7 +26,9 @@ try {
 const env = process.env;
 const name = previewDatabaseName(alias);
 
-if (findD1Database(runForOutput("npx", d1ListArgs(), env), name)) {
+if (
+  findD1Database(run("npx", d1ListArgs(), env, { capture: "stdout" }), name)
+) {
   run("npx", d1DeleteArgs(name), env);
   console.error(`Deleted D1 database ${name}`);
 } else {

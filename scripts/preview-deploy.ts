@@ -17,14 +17,7 @@
  * stdout stays machine-readable.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import {
-  captureWranglerOutput,
-  run,
-  runCapturingOutput,
-  runForOutput,
-  tryRun,
-  tryRunForOutput,
-} from "./deploy-steps.ts";
+import { captureWranglerOutput, run, runStep } from "./deploy-steps.ts";
 import { openPrListArgs, openPrNumbers } from "./open-pull-requests.ts";
 import { parsePreviewAlias, prNumberOfAlias } from "./preview-alias.ts";
 import {
@@ -66,13 +59,15 @@ const ownPr = prNumberOfAlias(alias);
 // asked (no gh, no `gh auth login` or GH_TOKEN, an API error). Never prompts.
 // This deploy's own PR always counts as open, even if GitHub lags behind.
 function openPullRequests(): ReadonlySet<number> | undefined {
-  const output = tryRunForOutput("gh", openPrListArgs(), {
-    ...env,
-    GH_PROMPT_DISABLED: "1",
-  });
-  if (output === undefined) return undefined;
+  const listed = runStep(
+    "gh",
+    openPrListArgs(),
+    { ...env, GH_PROMPT_DISABLED: "1" },
+    { capture: "stdout", stdin: "ignore" },
+  );
+  if (!listed.ok) return undefined;
   try {
-    const open = openPrNumbers(output);
+    const open = openPrNumbers(listed.output);
     if (ownPr !== undefined) open.add(ownPr);
     return open;
   } catch (error) {
@@ -97,7 +92,7 @@ function deleteNotOpenPrDatabases(
     console.error("No preview databases of PRs that are not open to delete");
   }
   for (const database of notOpen) {
-    if (tryRun("npx", d1DeleteArgs(database.name), env)) {
+    if (runStep("npx", d1DeleteArgs(database.name), env).ok) {
       console.error(
         `Deleted D1 database ${database.name} (PR #${database.pr} is not open)`,
       );
@@ -113,7 +108,7 @@ function deleteNotOpenPrDatabases(
 // its data); only a missing one is created. Done before the build so a D1
 // failure, the account's database limit included, stops the deploy early.
 function ensurePreviewDatabase(name: string): D1Database {
-  const listing = runForOutput("npx", d1ListArgs(), env);
+  const listing = run("npx", d1ListArgs(), env, { capture: "stdout" });
   const prDatabases = prPreviewDatabases(listing);
   const open = openPullRequests();
   if (open) {
@@ -128,14 +123,16 @@ function ensurePreviewDatabase(name: string): D1Database {
     console.error(`Reusing D1 database ${name} (${existing.id})`);
     return existing;
   }
-  const created = runCapturingOutput("npx", d1CreateArgs(name), env);
+  const created = runStep("npx", d1CreateArgs(name), env, { capture: "all" });
   if (!created.ok) {
     if (isD1LimitError(created.output)) {
       console.error(`\n${d1LimitMessage(prDatabases, open)}`);
     }
-    process.exit(1);
+    process.exit(created.exitCode);
   }
-  return d1DatabaseFromInfo(runForOutput("npx", d1InfoArgs(name), env));
+  return d1DatabaseFromInfo(
+    run("npx", d1InfoArgs(name), env, { capture: "stdout" }),
+  );
 }
 
 const database = ensurePreviewDatabase(previewDatabaseName(alias));
