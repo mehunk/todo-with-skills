@@ -27,6 +27,30 @@ export function run(command: string, args: string[], env: NodeJS.ProcessEnv) {
 }
 
 /**
+ * Runs `command` like `run`, but returns its stdout (for Wrangler's `--json`
+ * output) instead of streaming it. Its stderr still goes to stderr.
+ */
+export function runForOutput(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): string {
+  console.error(`\n$ ${command} ${args.join(" ")}`);
+  const result = spawnSync(command, args, {
+    stdio: ["inherit", "pipe", "inherit"],
+    env,
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    process.stderr.write(result.stdout ?? "");
+    console.error(`\n${command} ${args[0]} failed (exit ${result.status})`);
+    process.exit(result.status ?? 1);
+  }
+  return result.stdout;
+}
+
+/**
  * Calls `step` with a temporary WRANGLER_OUTPUT_FILE_PATH, then returns the
  * ND-JSON Wrangler wrote there. The temporary directory is always removed.
  */
