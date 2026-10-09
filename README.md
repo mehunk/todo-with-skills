@@ -1,4 +1,4 @@
-Welcome to your new TanStack Start app!
+一个运行在 Cloudflare Workers 上的待办事项应用，基于 TanStack Start 构建，用 D1 存储数据、Clerk 处理登录。
 
 # Getting Started
 
