@@ -3,9 +3,12 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import type { List, NewList } from "#/todos";
 import { createList, fetchList, fetchLists } from "./functions";
+import { listNameSchema } from "./schemas";
 
 // TanStack Query wiring for Lists: query options shared by route loaders and
 // components, and the optimistic create mutation.
@@ -76,4 +79,45 @@ export function useCreateList() {
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: listsKey, exact: true }),
   });
+}
+
+/**
+ * Creating a List from a typed name, shared by the "No Lists" empty state and
+ * the sidebar's new-List input. `create` validates the name, keeping its
+ * error in `error`; a valid name creates the List, which is opened once it is
+ * saved (after `onSaved`). Returns whether the name was valid.
+ */
+export function useCreateListFromName({
+  onSaved,
+}: {
+  onSaved?: () => void;
+} = {}) {
+  const navigate = useNavigate();
+  const createList = useCreateList();
+  const [error, setError] = useState<string>();
+
+  const create = (name: string) => {
+    const parsed = listNameSchema.safeParse(name);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0].message);
+      return false;
+    }
+    createList.mutate(
+      { name: parsed.data },
+      {
+        onSuccess: (list) => {
+          onSaved?.();
+          navigate({ to: "/lists/$listId", params: { listId: list.id } });
+        },
+      },
+    );
+    return true;
+  };
+
+  return {
+    create,
+    error,
+    clearError: () => setError(undefined),
+    isPending: createList.isPending,
+  };
 }

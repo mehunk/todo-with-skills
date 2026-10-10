@@ -8,15 +8,16 @@ const LIST_PATH = /\/lists\/[0-9a-f-]{36}$/;
 const listTitle = (page: Page) =>
   page.getByRole("main").getByRole("heading", { level: 1 });
 
-test("an Owner opening / lands on a List and stays on it after a reload", async ({
-  page,
-  testData,
-}) => {
-  await page.goto("/");
-  await signIn(page);
+/** The sidebar's List rows: the desktop sidebar card (not the mobile drawer). */
+const sidebarLists = (page: Page) =>
+  page.getByRole("navigation", { name: "My Lists" }).getByRole("button");
 
-  // The shared E2E user may have no Lists yet: then / shows the "No Lists"
-  // empty state instead, and creating a List there must select it.
+/**
+ * After signing in at /, waits until the Owner has either been sent to a List
+ * or shown the "No Lists" empty state (the shared E2E user may have no Lists
+ * yet). True for the empty state.
+ */
+async function showsNoLists(page: Page) {
   const createFirst = page.getByRole("heading", {
     name: "Create your first List",
   });
@@ -26,7 +27,19 @@ test("an Owner opening / lands on a List and stays on it after a reload", async 
       (await createFirst.isVisible());
     expect(landed).toBe(true);
   }).toPass();
-  if (await createFirst.isVisible()) {
+  return createFirst.isVisible();
+}
+
+test("an Owner opening / lands on a List and stays on it after a reload", async ({
+  page,
+  testData,
+}) => {
+  await page.goto("/");
+  await signIn(page);
+
+  // With no Lists yet, / shows the "No Lists" empty state instead, and
+  // creating a List there must select it.
+  if (await showsNoLists(page)) {
     const name = testData.uniqueName("First List");
     await page.getByRole("textbox", { name: "List name" }).fill(name);
     await page.keyboard.press("Enter");
@@ -71,10 +84,6 @@ test("a signed-out visitor opening a List address sees the landing page", async 
   ).toBeVisible();
 });
 
-/** The sidebar's List rows: the desktop sidebar card (not the mobile drawer). */
-const sidebarLists = (page: Page) =>
-  page.getByRole("navigation", { name: "My Lists" }).getByRole("button");
-
 /**
  * Signs in and makes sure the shared E2E user has at least one List, creating
  * one from the "No Lists" empty state if needed. Ends on a List page.
@@ -82,16 +91,7 @@ const sidebarLists = (page: Page) =>
 async function signInToAList(page: Page, uniqueName: (name: string) => string) {
   await page.goto("/");
   await signIn(page);
-  const createFirst = page.getByRole("heading", {
-    name: "Create your first List",
-  });
-  await expect(async () => {
-    const landed =
-      LIST_PATH.test(new URL(page.url()).pathname) ||
-      (await createFirst.isVisible());
-    expect(landed).toBe(true);
-  }).toPass();
-  if (await createFirst.isVisible()) {
+  if (await showsNoLists(page)) {
     await page
       .getByRole("textbox", { name: "List name" })
       .fill(uniqueName("Sidebar List"));
@@ -167,9 +167,7 @@ test("an Owner creates two Lists from the sidebar and switches between them", as
   const first = testData.uniqueName("Sidebar First");
   const second = testData.uniqueName("Sidebar Second");
   const row = (name: string) =>
-    page
-      .getByRole("navigation", { name: "My Lists" })
-      .getByRole("button", { name, exact: true });
+    sidebarLists(page).and(page.getByRole("button", { name, exact: true }));
 
   // Each new List appears in the sidebar and is selected once created.
   // No Delete List yet, so these Lists stay (spec #12 Further Notes).
@@ -188,10 +186,7 @@ test("an Owner creates two Lists from the sidebar and switches between them", as
   const secondUrl = page.url();
 
   // The sidebar shows Lists in creation order: the first before the second.
-  const names = await page
-    .getByRole("navigation", { name: "My Lists" })
-    .getByRole("button")
-    .allTextContents();
+  const names = await sidebarLists(page).allTextContents();
   expect(names.indexOf(first)).toBeGreaterThanOrEqual(0);
   expect(names.indexOf(first)).toBeLessThan(names.indexOf(second));
 

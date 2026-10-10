@@ -4,9 +4,8 @@ import { useState } from "react";
 import {
   isListSaving,
   listsQueryOptions,
-  useCreateList,
+  useCreateListFromName,
 } from "#/todos/queries";
-import { listNameSchema } from "#/todos/schemas";
 import { useCloseSidebarDrawer } from "./AppShell";
 import { Sidebar } from "./Sidebar";
 
@@ -21,13 +20,12 @@ export function ListsSidebar({ selectedListId }: { selectedListId?: string }) {
   const { data: lists } = useSuspenseQuery(listsQueryOptions());
   const navigate = useNavigate();
   const closeDrawer = useCloseSidebarDrawer();
-  const createList = useCreateList();
+  const createList = useCreateListFromName({ onSaved: closeDrawer });
   const [newListOpen, setNewListOpen] = useState(false);
-  const [newListError, setNewListError] = useState<string>();
 
   const closeNewList = () => {
     setNewListOpen(false);
-    setNewListError(undefined);
+    createList.clearError();
   };
 
   return (
@@ -43,25 +41,11 @@ export function ListsSidebar({ selectedListId }: { selectedListId?: string }) {
       }}
       onAddList={() => setNewListOpen(true)}
       newListOpen={newListOpen}
-      newListError={newListError}
-      onNewListNameChange={() => setNewListError(undefined)}
+      newListError={createList.error}
+      onNewListNameChange={createList.clearError}
       onCancelNewList={closeNewList}
       onCreateList={(name) => {
-        const parsed = listNameSchema.safeParse(name);
-        if (!parsed.success) {
-          setNewListError(parsed.error.issues[0].message);
-          return;
-        }
-        closeNewList();
-        createList.mutate(
-          { name: parsed.data },
-          {
-            onSuccess: (list) => {
-              closeDrawer();
-              navigate({ to: "/lists/$listId", params: { listId: list.id } });
-            },
-          },
-        );
+        if (createList.create(name)) closeNewList();
       }}
     />
   );

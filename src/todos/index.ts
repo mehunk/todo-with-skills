@@ -15,6 +15,11 @@ const creationOrder = [asc(lists.createdAt), asc(sql`rowid`)];
 /** A List as the Owner sees it. */
 export type List = { id: string; name: string };
 
+/** A List, or why the operation couldn't produce one. */
+export type ListResult<E extends string = string> =
+  | { ok: true; list: List }
+  | { ok: false; error: E };
+
 /**
  * The Todos module: the single public interface (and test seam) for Lists and
  * Todos. Every operation takes the Owner (Clerk user ID, ADR-0001) first and
@@ -35,7 +40,7 @@ export function createTodos(db: Database) {
     async getList(
       ownerId: string,
       listId: string,
-    ): Promise<{ ok: true; list: List } | { ok: false; error: "not-found" }> {
+    ): Promise<ListResult<"not-found">> {
       const list = await db
         .select({ id: lists.id, name: lists.name })
         .from(lists)
@@ -48,7 +53,7 @@ export function createTodos(db: Database) {
     async createList(
       ownerId: string,
       input: { name: string },
-    ): Promise<{ ok: true; list: List } | { ok: false; error: string }> {
+    ): Promise<ListResult> {
       const parsed = newListSchema.safeParse(input);
       if (!parsed.success) {
         return { ok: false, error: parsed.error.issues[0].message };

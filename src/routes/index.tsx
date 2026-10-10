@@ -1,26 +1,21 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AppShell } from "#/components/AppShell";
-import { LandingPage } from "#/components/LandingPage";
+import { LandingPage, loadIfSignedIn } from "#/components/LandingPage";
 import { ListsSidebar } from "#/components/ListsSidebar";
 import { MainHeader } from "#/components/MainHeader";
 import { NoLists } from "#/components/NoLists";
-import { fetchOwnerId } from "#/todos/functions";
-import { listsQueryOptions, useCreateList } from "#/todos/queries";
-import { listNameSchema } from "#/todos/schemas";
+import { listsQueryOptions, useCreateListFromName } from "#/todos/queries";
 
 export const Route = createFileRoute("/")({
-  loader: async ({ context }) => {
-    const ownerId = await fetchOwnerId();
-    if (!ownerId) return { signedIn: false };
-    const [first] = await context.queryClient.ensureQueryData(
-      listsQueryOptions(),
-    );
-    if (first) {
-      throw redirect({ to: "/lists/$listId", params: { listId: first.id } });
-    }
-    return { signedIn: true };
-  },
+  loader: ({ context }) =>
+    loadIfSignedIn(async () => {
+      const [first] = await context.queryClient.ensureQueryData(
+        listsQueryOptions(),
+      );
+      if (first) {
+        throw redirect({ to: "/lists/$listId", params: { listId: first.id } });
+      }
+    }),
   component: Home,
 });
 
@@ -36,28 +31,14 @@ function Home() {
 }
 
 function CreateFirstList() {
-  const navigate = useNavigate();
-  const createList = useCreateList();
-  const [error, setError] = useState<string>();
+  const createList = useCreateListFromName();
 
   return (
     <NoLists
-      error={error}
-      onNameChange={() => setError(undefined)}
+      error={createList.error}
+      onNameChange={createList.clearError}
       onCreate={(name) => {
-        const parsed = listNameSchema.safeParse(name);
-        if (!parsed.success) {
-          setError(parsed.error.issues[0].message);
-          return;
-        }
-        if (createList.isPending) return;
-        createList.mutate(
-          { name: parsed.data },
-          {
-            onSuccess: (list) =>
-              navigate({ to: "/lists/$listId", params: { listId: list.id } }),
-          },
-        );
+        if (!createList.isPending) createList.create(name);
       }}
     />
   );

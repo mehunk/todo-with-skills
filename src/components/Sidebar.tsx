@@ -73,23 +73,24 @@ export function Sidebar({
               const saving = savingListIds?.has(list.id) ?? false;
               return (
                 <li key={list.id}>
-                  <button
+                  <Button
                     type="button"
+                    variant={selected ? "default" : "ghost"}
                     aria-current={selected ? "page" : undefined}
                     aria-busy={saving || undefined}
                     disabled={saving}
                     title={list.name}
                     onClick={() => onSelectList(list.id)}
                     className={cn(
-                      "flex h-11 w-full items-center rounded-lg px-2 text-left text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:h-9",
+                      "h-11 w-full justify-start rounded-lg px-2 text-left font-normal disabled:opacity-100 sm:h-9",
                       selected
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted",
-                      saving && "text-muted-foreground hover:bg-transparent",
+                        ? "hover:bg-primary"
+                        : "hover:bg-muted hover:text-foreground dark:hover:bg-muted",
+                      saving && "text-muted-foreground",
                     )}
                   >
                     <span className="min-w-0 flex-1 truncate">{list.name}</span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}

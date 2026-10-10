@@ -19,7 +19,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const dark = { themes: { themeOverride: "dark" } };
+
 export const ListName: Story = {};
+
+export const ListNameDark: Story = { parameters: dark };
 
 /** Long List names are truncated on one line. */
 export const LongListName: Story = {
@@ -29,5 +33,12 @@ export const LongListName: Story = {
   },
 };
 
+export const LongListNameDark: Story = { ...LongListName, parameters: dark };
+
 /** No List selected (the "No Lists" empty state). */
 export const NoListSelected: Story = { args: { title: "Todo" } };
+
+export const NoListSelectedDark: Story = {
+  ...NoListSelected,
+  parameters: dark,
+};
