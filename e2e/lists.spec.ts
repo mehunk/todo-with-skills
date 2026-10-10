@@ -109,8 +109,8 @@ test("clicking a List in the sidebar opens it, and back returns to the previous 
   await expect(sidebarLists(page).first()).toBeVisible();
 
   // Selecting each List shows it: highlighted row, address and header name.
-  // The shared user may have one List or many; the full two-List flow with
-  // sidebar create is covered once creating from the sidebar lands.
+  // The shared user may have one List or many; the two-List flow with sidebar
+  // create is the "creates two Lists from the sidebar" test below.
   for (const row of [sidebarLists(page).last(), sidebarLists(page).first()]) {
     const name = (await row.textContent()) ?? "";
     await row.click();
@@ -148,4 +148,94 @@ test("on a phone, selecting a List closes the drawer", async ({
 
   await expect(drawer).toBeHidden();
   await expect(listTitle(page)).toHaveText(name);
+});
+
+/** Opens the sidebar's new-List input, types `name` and presses Enter. */
+async function createListFromSidebar(page: Page, name: string) {
+  await page.getByRole("button", { name: "New List" }).click();
+  const input = page.getByRole("textbox", { name: "List name" });
+  await expect(input).toBeFocused();
+  await input.fill(name);
+  await input.press("Enter");
+}
+
+test("an Owner creates two Lists from the sidebar and switches between them", async ({
+  page,
+  testData,
+}) => {
+  await signInToAList(page, testData.uniqueName);
+  const first = testData.uniqueName("Sidebar First");
+  const second = testData.uniqueName("Sidebar Second");
+  const row = (name: string) =>
+    page
+      .getByRole("navigation", { name: "My Lists" })
+      .getByRole("button", { name, exact: true });
+
+  // Each new List appears in the sidebar and is selected once created.
+  // No Delete List yet, so these Lists stay (spec #12 Further Notes).
+  await createListFromSidebar(page, first);
+  await expect(listTitle(page)).toHaveText(first);
+  await expect(page).toHaveURL(LIST_PATH);
+  await expect(row(first)).toHaveAttribute("aria-current", "page");
+  const firstUrl = page.url();
+
+  await createListFromSidebar(page, second);
+  await expect(listTitle(page)).toHaveText(second);
+  await expect(page).not.toHaveURL(firstUrl);
+  await expect(page).toHaveURL(LIST_PATH);
+  await expect(row(second)).toHaveAttribute("aria-current", "page");
+  await expect(row(first)).not.toHaveAttribute("aria-current", "page");
+  const secondUrl = page.url();
+
+  // The sidebar shows Lists in creation order: the first before the second.
+  const names = await page
+    .getByRole("navigation", { name: "My Lists" })
+    .getByRole("button")
+    .allTextContents();
+  expect(names.indexOf(first)).toBeGreaterThanOrEqual(0);
+  expect(names.indexOf(first)).toBeLessThan(names.indexOf(second));
+
+  await row(first).click();
+  await expect(page).toHaveURL(firstUrl);
+  await expect(listTitle(page)).toHaveText(first);
+  await expect(row(first)).toHaveAttribute("aria-current", "page");
+
+  await row(second).click();
+  await expect(page).toHaveURL(secondUrl);
+  await expect(listTitle(page)).toHaveText(second);
+
+  await page.reload();
+  await expect(page).toHaveURL(secondUrl);
+  await expect(listTitle(page)).toHaveText(second);
+  await expect(row(second)).toHaveAttribute("aria-current", "page");
+});
+
+test("the sidebar's new-List input rejects an empty name and Esc cancels it", async ({
+  page,
+  testData,
+}) => {
+  await signInToAList(page, testData.uniqueName);
+  const listUrl = page.url();
+  await expect(sidebarLists(page).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "New List" }).click();
+  const input = page.getByRole("textbox", { name: "List name" });
+  await expect(input).toBeFocused();
+  await input.fill("   ");
+  await input.press("Enter");
+  await expect(page.getByText("Enter a List name")).toBeVisible();
+  await expect(input).toBeVisible();
+
+  // A name typed and then abandoned with Esc creates nothing.
+  const abandoned = testData.uniqueName("Abandoned");
+  await input.fill(abandoned);
+  await input.press("Escape");
+  await expect(input).toBeHidden();
+  await expect(page).toHaveURL(listUrl);
+
+  await page.reload();
+  await expect(sidebarLists(page).first()).toBeVisible();
+  await expect(sidebarLists(page).filter({ hasText: abandoned })).toHaveCount(
+    0,
+  );
 });

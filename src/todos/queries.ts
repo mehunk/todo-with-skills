@@ -22,6 +22,15 @@ export const listQueryOptions = (listId: string) =>
     queryFn: () => fetchList({ data: { listId } }),
   });
 
+const OPTIMISTIC_ID_PREFIX = "optimistic-";
+
+/**
+ * True while a List created optimistically is still saving: it has no server
+ * ID yet, so it has no address to navigate to.
+ */
+export const isListSaving = (list: List) =>
+  list.id.startsWith(OPTIMISTIC_ID_PREFIX);
+
 export const SAVE_FAILED_MESSAGE = "Couldn't save — try again";
 
 /**
@@ -41,7 +50,7 @@ export function useCreateList() {
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: listsKey, exact: true });
       const optimistic: List = {
-        id: `optimistic-${crypto.randomUUID()}`,
+        id: `${OPTIMISTIC_ID_PREFIX}${crypto.randomUUID()}`,
         name: input.name.trim(),
       };
       queryClient.setQueryData<List[]>(listsKey, (lists) => [

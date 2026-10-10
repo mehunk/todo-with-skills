@@ -14,7 +14,14 @@ const meta = {
       </div>
     ),
   ],
-  args: { lists: [], onSelectList: fn(), onAddList: fn() },
+  args: {
+    lists: [],
+    onSelectList: fn(),
+    onAddList: fn(),
+    onCreateList: fn(),
+    onCancelNewList: fn(),
+    onNewListNameChange: fn(),
+  },
 } satisfies Meta<typeof Sidebar>;
 
 export default meta;
@@ -65,3 +72,39 @@ export const Mobile: Story = {
   args: { lists, selectedListId: "work" },
   globals: { viewport: { value: "mobile1" } },
 };
+
+/** After `+`: the focused new-List input at the bottom. */
+export const NewListInput: Story = {
+  args: { lists, selectedListId: "work", newListOpen: true },
+};
+
+export const NewListInputDark: Story = {
+  ...NewListInput,
+  parameters: dark,
+};
+
+/** Enter on an empty name: the validation error under the input. */
+export const NewListValidationError: Story = {
+  args: { ...NewListInput.args, newListError: "Enter a List name" },
+};
+
+export const NewListValidationErrorDark: Story = {
+  ...NewListValidationError,
+  parameters: dark,
+};
+
+/** The new-List input when the Owner has no Lists yet. */
+export const NewListInputNoLists: Story = {
+  args: { newListOpen: true },
+};
+
+/** A just-created List shows at once but can't be selected until saved. */
+export const SavingList: Story = {
+  args: {
+    lists: [...lists, { id: "saving", name: "Holiday plans" }],
+    selectedListId: "work",
+    savingListIds: new Set(["saving"]),
+  },
+};
+
+export const SavingListDark: Story = { ...SavingList, parameters: dark };
