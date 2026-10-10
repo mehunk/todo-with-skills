@@ -1,11 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { toast } from "sonner";
+import { fn } from "storybook/test";
 import { AppShell } from "./AppShell";
-import {
-  PlaceholderHeader,
-  PlaceholderMain,
-  PlaceholderSidebar,
-} from "./ShellPlaceholder";
+import { MainHeader } from "./MainHeader";
+import { NoLists } from "./NoLists";
+import { Sidebar } from "./Sidebar";
 import { Button } from "./ui/button";
 
 const meta = {
@@ -19,9 +18,9 @@ const meta = {
     ),
   ],
   args: {
-    sidebar: <PlaceholderSidebar />,
-    header: <PlaceholderHeader />,
-    children: <PlaceholderMain />,
+    sidebar: <Sidebar lists={[]} onSelectList={fn()} />,
+    header: <MainHeader title="Todo" />,
+    children: <NoLists onCreate={fn()} />,
   },
 } satisfies Meta<typeof AppShell>;
 
@@ -41,6 +40,28 @@ export const Mobile: Story = {
 export const MobileDrawerOpen: Story = {
   globals: { viewport: { value: "mobile1" } },
   args: { defaultDrawerOpen: true },
+};
+
+const lists = [
+  { id: "groceries", name: "Groceries" },
+  { id: "work", name: "Work" },
+];
+
+/** A List selected: its name in the header, highlighted in the sidebar. */
+export const WithLists: Story = {
+  args: {
+    sidebar: (
+      <Sidebar lists={lists} selectedListId="work" onSelectList={fn()} />
+    ),
+    header: <MainHeader title="Work" />,
+    children: <div className="flex-1" />,
+  },
+};
+
+export const MobileDrawerOpenWithLists: Story = {
+  ...WithLists,
+  globals: { viewport: { value: "mobile1" } },
+  args: { ...WithLists.args, defaultDrawerOpen: true },
 };
 
 /** The root Toaster reports failures; any component can call `toast`. */

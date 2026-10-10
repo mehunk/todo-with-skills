@@ -1,38 +1,45 @@
-import { Show, SignInButton } from "@clerk/tanstack-react-start";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AppShell } from "#/components/AppShell";
-import Footer from "#/components/Footer";
-import { Landing } from "#/components/Landing";
-import {
-  PlaceholderHeader,
-  PlaceholderMain,
-  PlaceholderSidebar,
-} from "#/components/ShellPlaceholder";
-import { Button } from "#/components/ui/button";
+import { LandingPage, loadIfSignedIn } from "#/components/LandingPage";
+import { ListsSidebar } from "#/components/ListsSidebar";
+import { MainHeader } from "#/components/MainHeader";
+import { NoLists } from "#/components/NoLists";
+import { listsQueryOptions, useCreateListFromName } from "#/todos/queries";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/")({
+  loader: ({ context }) =>
+    loadIfSignedIn(async () => {
+      const [first] = await context.queryClient.ensureQueryData(
+        listsQueryOptions(),
+      );
+      if (first) {
+        throw redirect({ to: "/lists/$listId", params: { listId: first.id } });
+      }
+    }),
+  component: Home,
+});
 
 function Home() {
+  const { signedIn } = Route.useLoaderData();
+  if (!signedIn) return <LandingPage />;
+
   return (
-    <>
-      <Show when="signed-in">
-        <AppShell
-          sidebar={<PlaceholderSidebar />}
-          header={<PlaceholderHeader />}
-        >
-          <PlaceholderMain />
-        </AppShell>
-      </Show>
-      <Show when="signed-out">
-        <Landing
-          signIn={
-            <SignInButton>
-              <Button size="lg">Sign in to get started</Button>
-            </SignInButton>
-          }
-        />
-        <Footer />
-      </Show>
-    </>
+    <AppShell sidebar={<ListsSidebar />} header={<MainHeader title="Todo" />}>
+      <CreateFirstList />
+    </AppShell>
+  );
+}
+
+function CreateFirstList() {
+  const createList = useCreateListFromName();
+
+  return (
+    <NoLists
+      error={createList.error}
+      onNameChange={createList.clearError}
+      onCreate={(name) => {
+        if (!createList.isPending) createList.create(name);
+      }}
+    />
   );
 }
