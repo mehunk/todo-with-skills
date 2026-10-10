@@ -1,11 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { toast } from "sonner";
+import { fn } from "storybook/test";
 import { AppShell } from "./AppShell";
-import {
-  PlaceholderHeader,
-  PlaceholderMain,
-  PlaceholderSidebar,
-} from "./ShellPlaceholder";
+import { MainHeader } from "./MainHeader";
+import { NoLists } from "./NoLists";
+import { PlaceholderSidebar } from "./ShellPlaceholder";
 import { Button } from "./ui/button";
 
 const meta = {
@@ -20,8 +19,8 @@ const meta = {
   ],
   args: {
     sidebar: <PlaceholderSidebar />,
-    header: <PlaceholderHeader />,
-    children: <PlaceholderMain />,
+    header: <MainHeader title="Todo" />,
+    children: <NoLists onCreate={fn()} />,
   },
 } satisfies Meta<typeof AppShell>;
 

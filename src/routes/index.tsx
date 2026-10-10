@@ -1,38 +1,67 @@
-import { Show, SignInButton } from "@clerk/tanstack-react-start";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { AppShell } from "#/components/AppShell";
-import Footer from "#/components/Footer";
-import { Landing } from "#/components/Landing";
-import {
-  PlaceholderHeader,
-  PlaceholderMain,
-  PlaceholderSidebar,
-} from "#/components/ShellPlaceholder";
-import { Button } from "#/components/ui/button";
+import { LandingPage } from "#/components/LandingPage";
+import { MainHeader } from "#/components/MainHeader";
+import { NoLists } from "#/components/NoLists";
+import { PlaceholderSidebar } from "#/components/ShellPlaceholder";
+import { fetchOwnerId } from "#/todos/functions";
+import { listsQueryOptions, useCreateList } from "#/todos/queries";
+import { listNameSchema } from "#/todos/schemas";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/")({
+  loader: async ({ context }) => {
+    const ownerId = await fetchOwnerId();
+    if (!ownerId) return { signedIn: false };
+    const [first] = await context.queryClient.ensureQueryData(
+      listsQueryOptions(),
+    );
+    if (first) {
+      throw redirect({ to: "/lists/$listId", params: { listId: first.id } });
+    }
+    return { signedIn: true };
+  },
+  component: Home,
+});
 
 function Home() {
+  const { signedIn } = Route.useLoaderData();
+  if (!signedIn) return <LandingPage />;
+
   return (
-    <>
-      <Show when="signed-in">
-        <AppShell
-          sidebar={<PlaceholderSidebar />}
-          header={<PlaceholderHeader />}
-        >
-          <PlaceholderMain />
-        </AppShell>
-      </Show>
-      <Show when="signed-out">
-        <Landing
-          signIn={
-            <SignInButton>
-              <Button size="lg">Sign in to get started</Button>
-            </SignInButton>
-          }
-        />
-        <Footer />
-      </Show>
-    </>
+    <AppShell
+      sidebar={<PlaceholderSidebar />}
+      header={<MainHeader title="Todo" />}
+    >
+      <CreateFirstList />
+    </AppShell>
+  );
+}
+
+function CreateFirstList() {
+  const navigate = useNavigate();
+  const createList = useCreateList();
+  const [error, setError] = useState<string>();
+
+  return (
+    <NoLists
+      error={error}
+      onNameChange={() => setError(undefined)}
+      onCreate={(name) => {
+        const parsed = listNameSchema.safeParse(name);
+        if (!parsed.success) {
+          setError(parsed.error.issues[0].message);
+          return;
+        }
+        if (createList.isPending) return;
+        createList.mutate(
+          { name: parsed.data },
+          {
+            onSuccess: (list) =>
+              navigate({ to: "/lists/$listId", params: { listId: list.id } }),
+          },
+        );
+      }}
+    />
   );
 }

@@ -23,10 +23,9 @@ test("a visitor signs in to the app shell and signs out to the landing page", as
 
   await test.step("after signing in, the app shell is visible", async () => {
     await signIn(page);
+    // The shared E2E user may already have Lists, so this checks the shell,
+    // not the "No Lists" empty state (covered by its stories instead).
     await expect(page.getByText("My Lists")).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Create your first List" }),
-    ).toBeVisible();
     await expect(page.getByText(versionText, { exact: true })).toBeVisible();
   });
 

@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import Header from "../components/Header";
 import { Button } from "../components/ui/button";
 import { Toaster } from "../components/ui/sonner";
+import { AuthSync } from "../integrations/clerk/auth-sync";
 import ClerkProvider from "../integrations/clerk/provider";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { THEME_INIT_SCRIPT } from "../lib/theme";
@@ -69,6 +70,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="flex min-h-dvh flex-col [overflow-wrap:anywhere]">
         <ClerkProvider>
+          <AuthSync />
           <Header />
           {children}
           <Toaster />
