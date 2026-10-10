@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Linear (team Todo-with-skills), via the `linear-todo-with-skills` MCP server: a spec is a Project with a "Spec" document, its tickets are Issues in that Project linked by `blockedBy`. See `docs/agents/issue-tracker.md`.
+GitHub Issues in `mehunk/todo-with-skills`, via `gh`: a spec is an issue labelled `spec`, its tickets are its sub-issues linked by native `blocked by` dependencies. Earlier specs (`P-TOD-*`) are in the former Linear team Todo-with-skills (read-only). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
