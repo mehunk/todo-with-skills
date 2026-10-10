@@ -2,9 +2,9 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "#/components/AppShell";
 import { LandingPage } from "#/components/LandingPage";
+import { ListsSidebar } from "#/components/ListsSidebar";
 import { MainHeader } from "#/components/MainHeader";
 import { NoLists } from "#/components/NoLists";
-import { PlaceholderSidebar } from "#/components/ShellPlaceholder";
 import { fetchOwnerId } from "#/todos/functions";
 import { listsQueryOptions, useCreateList } from "#/todos/queries";
 import { listNameSchema } from "#/todos/schemas";
@@ -29,10 +29,7 @@ function Home() {
   if (!signedIn) return <LandingPage />;
 
   return (
-    <AppShell
-      sidebar={<PlaceholderSidebar />}
-      header={<MainHeader title="Todo" />}
-    >
+    <AppShell sidebar={<ListsSidebar />} header={<MainHeader title="Todo" />}>
       <CreateFirstList />
     </AppShell>
   );
