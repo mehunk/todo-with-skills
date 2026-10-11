@@ -5,6 +5,7 @@ import {
   listTitle,
   sidebarLists,
 } from "./support/lists";
+import { reloadWhenSaved } from "./support/saves";
 import {
   addTodo,
   addTodoInput,
@@ -40,7 +41,7 @@ test("an Owner adds three Todos and sees them in creation order, also after a re
   await expect(openCount(page)).toHaveText("3 open");
   await expect(emptyList(page)).toBeHidden();
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(todoRows(page)).toHaveText(titles);
   await expect(openCount(page)).toHaveText("3 open");
 });
@@ -133,7 +134,7 @@ test("an Owner completes a Todo and reopens it, back in its place", async ({
   await expect(todoCheckbox(page, eggs)).toBeChecked();
   await expect(openCount(page)).toHaveText("2 open");
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(todoRows(page)).toHaveText([milk, bread]);
   await expect(completedRows(page)).toHaveText([eggs]);
   await expect(openCount(page)).toHaveText("2 open");
@@ -143,7 +144,7 @@ test("an Owner completes a Todo and reopens it, back in its place", async ({
   await expect(completedToggle(page)).toBeHidden();
   await expect(openCount(page)).toHaveText("3 open");
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(todoRows(page)).toHaveText([milk, eggs, bread]);
   await expect(completedToggle(page)).toBeHidden();
 });
@@ -214,7 +215,7 @@ test("an Owner clears the Completed Todos after confirming; Cancel removes nothi
   await expect(todoRows(page)).toHaveText([eggs]);
   await expect(openCount(page)).toHaveText("1 open");
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(todoRows(page)).toHaveText([eggs]);
   await expect(completedToggle(page)).toBeHidden();
 });

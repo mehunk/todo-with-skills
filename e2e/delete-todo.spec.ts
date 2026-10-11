@@ -1,4 +1,5 @@
 import { expect, test } from "./support/fixtures";
+import { reloadWhenSaved } from "./support/saves";
 import { addTodo, openCount, openNewList, todoRows } from "./support/todos";
 
 test("an Owner Deletes one Todo; it is gone, also after a reload, and the others remain", async ({
@@ -20,7 +21,7 @@ test("an Owner Deletes one Todo; it is gone, also after a reload, and the others
   await expect(todoRows(page)).toHaveText([milk, bread]);
   await expect(openCount(page)).toHaveText("2 open");
 
-  await page.reload();
+  await reloadWhenSaved(page);
   await expect(todoRows(page)).toHaveText([milk, bread]);
   await expect(openCount(page)).toHaveText("2 open");
 });
