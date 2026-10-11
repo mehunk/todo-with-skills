@@ -222,6 +222,70 @@ describe("getList with Todos", () => {
   });
 });
 
+describe("setCompleted", () => {
+  it("completes a Todo, which then no longer counts as open", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    const milk = await addedTodo(ALICE, list.id, "Milk");
+    const eggs = await addedTodo(ALICE, list.id, "Eggs");
+
+    const result = await todos().setCompleted(ALICE, milk.id, true);
+
+    expect(result).toEqual({ ok: true, todo: { ...milk, completed: true } });
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      list: { todos: [{ ...milk, completed: true }, eggs], openCount: 1 },
+    });
+  });
+
+  it("reopens a Completed Todo, back in its creation-order place", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    const milk = await addedTodo(ALICE, list.id, "Milk");
+    const eggs = await addedTodo(ALICE, list.id, "Eggs");
+    const bread = await addedTodo(ALICE, list.id, "Bread");
+    await todos().setCompleted(ALICE, eggs.id, true);
+
+    const result = await todos().setCompleted(ALICE, eggs.id, false);
+
+    expect(result).toEqual({ ok: true, todo: eggs });
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      list: { todos: [milk, eggs, bread], openCount: 3 },
+    });
+  });
+
+  it.each([
+    true,
+    false,
+  ])("is idempotent when setting Completed to %s twice", async (completed) => {
+    const list = await createdList(ALICE, "Groceries");
+    const milk = await addedTodo(ALICE, list.id, "Milk");
+
+    await todos().setCompleted(ALICE, milk.id, completed);
+    const result = await todos().setCompleted(ALICE, milk.id, completed);
+
+    expect(result).toEqual({ ok: true, todo: { ...milk, completed } });
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      list: { todos: [{ ...milk, completed }], openCount: completed ? 0 : 1 },
+    });
+  });
+
+  it("reports not found for an unknown Todo", async () => {
+    const result = await todos().setCompleted(ALICE, crypto.randomUUID(), true);
+
+    expect(result).toEqual({ ok: false, error: "not-found" });
+  });
+
+  it("reports not found for another Owner's Todo and leaves it unchanged", async () => {
+    const bobs = await createdList(BOB, "Bob's");
+    const milk = await addedTodo(BOB, bobs.id, "Milk");
+
+    const result = await todos().setCompleted(ALICE, milk.id, true);
+
+    expect(result).toEqual({ ok: false, error: "not-found" });
+    expect(await todos().getList(BOB, bobs.id)).toMatchObject({
+      list: { todos: [milk], openCount: 1 },
+    });
+  });
+});
+
 async function addedTodo(ownerId: string, listId: string, title: string) {
   const result = await todos().addTodo(ownerId, listId, { title });
   if (!result.ok) throw new Error(result.error);

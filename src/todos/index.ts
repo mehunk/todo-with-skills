@@ -129,6 +129,26 @@ export function createTodos(db: Database) {
       await db.insert(todos).values({ ...todo, listId, createdAt: new Date() });
       return { ok: true, todo };
     },
+
+    /**
+     * Marks the Owner's Todo Completed (or reopens it); idempotent. An unknown
+     * or another Owner's Todo is reported as not found and left unchanged.
+     */
+    async setCompleted(
+      ownerId: string,
+      todoId: string,
+      completed: boolean,
+    ): Promise<TodoResult<"not-found">> {
+      const todo = await db
+        .select({ id: todos.id, title: todos.title })
+        .from(todos)
+        .innerJoin(lists, eq(todos.listId, lists.id))
+        .where(and(eq(todos.id, todoId), eq(lists.ownerId, ownerId)))
+        .get();
+      if (!todo) return { ok: false, error: "not-found" };
+      await db.update(todos).set({ completed }).where(eq(todos.id, todoId));
+      return { ok: true, todo: { ...todo, completed } };
+    },
   };
 }
 
