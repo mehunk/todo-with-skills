@@ -130,6 +130,19 @@ test("switching Lists shows only the selected List's Todos", async ({
 const todoCheckbox = (page: Page, title: string) =>
   page.getByRole("checkbox", { name: title, exact: true });
 
+/**
+ * Ticks or unticks the Todo titled `title`: clicks its checkbox, then waits
+ * for the visible outcome. Not `check()`/`uncheck()`: the checkbox is
+ * controlled by the cached List, which the optimistic update changes a tick
+ * after the click, and `check()` reads the state right after clicking, so it
+ * fails with "Clicking the checkbox did not change its state".
+ */
+async function setTodoCompleted(page: Page, title: string, completed: boolean) {
+  await todoCheckbox(page, title).click();
+  if (completed) await expect(todoCheckbox(page, title)).toBeChecked();
+  else await expect(todoCheckbox(page, title)).not.toBeChecked();
+}
+
 /** The Completed section's rows, in the order shown. */
 const completedRows = (page: Page) =>
   page
@@ -153,7 +166,7 @@ test("an Owner completes a Todo and reopens it, back in its place", async ({
   // No Completed Todos: no Completed section.
   await expect(completedToggle(page)).toBeHidden();
 
-  await todoCheckbox(page, eggs).check();
+  await setTodoCompleted(page, eggs, true);
   await expect(todoRows(page)).toHaveText([milk, bread]);
   await expect(completedToggle(page)).toHaveText("Completed (1)");
   await expect(completedRows(page)).toHaveText([eggs]);
@@ -165,7 +178,7 @@ test("an Owner completes a Todo and reopens it, back in its place", async ({
   await expect(completedRows(page)).toHaveText([eggs]);
   await expect(openCount(page)).toHaveText("2 open");
 
-  await todoCheckbox(page, eggs).uncheck();
+  await setTodoCompleted(page, eggs, false);
   await expect(todoRows(page)).toHaveText([milk, eggs, bread]);
   await expect(completedToggle(page)).toBeHidden();
   await expect(openCount(page)).toHaveText("3 open");
@@ -184,8 +197,8 @@ test("the Completed section is expanded by default and collapses and expands", a
     testData.uniqueName(title),
   );
   for (const title of [milk, eggs]) await addTodo(page, title);
-  await todoCheckbox(page, milk).check();
-  await todoCheckbox(page, eggs).check();
+  await setTodoCompleted(page, milk, true);
+  await setTodoCompleted(page, eggs, true);
 
   await expect(completedToggle(page)).toHaveText("Completed (2)");
   await expect(completedToggle(page)).toHaveAttribute("aria-expanded", "true");
@@ -211,8 +224,8 @@ test("an Owner clears the Completed Todos after confirming; Cancel removes nothi
     testData.uniqueName(title),
   );
   for (const title of [milk, eggs, bread]) await addTodo(page, title);
-  await todoCheckbox(page, milk).check();
-  await todoCheckbox(page, bread).check();
+  await setTodoCompleted(page, milk, true);
+  await setTodoCompleted(page, bread, true);
   await expect(completedRows(page)).toHaveText([milk, bread]);
 
   // While the dialog is open, the page behind it is hidden from the
