@@ -2,8 +2,10 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { AppShell } from "#/components/AppShell";
 import { LandingPage, loadIfSignedIn } from "#/components/LandingPage";
+import { ListHeader } from "#/components/ListHeader";
 import { ListsSidebar } from "#/components/ListsSidebar";
-import { MainHeader } from "#/components/MainHeader";
+import { ListTodos } from "#/components/ListTodos";
+import { openCount } from "#/todos";
 import { listQueryOptions, listsQueryOptions } from "#/todos/queries";
 
 export const Route = createFileRoute("/lists/$listId")({
@@ -27,15 +29,20 @@ function ListPage() {
   return (
     <AppShell
       sidebar={<ListsSidebar selectedListId={listId} />}
-      header={<SelectedListName />}
+      header={<SelectedListHeader />}
     >
-      <div className="flex-1" />
+      <ListTodos key={listId} listId={listId} />
     </AppShell>
   );
 }
 
-function SelectedListName() {
+function SelectedListHeader() {
   const { listId } = Route.useParams();
   const { data: list } = useSuspenseQuery(listQueryOptions(listId));
-  return <MainHeader title={list?.name ?? ""} />;
+  return (
+    <ListHeader
+      name={list?.name ?? ""}
+      openCount={openCount(list?.todos ?? [])}
+    />
+  );
 }

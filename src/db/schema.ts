@@ -15,3 +15,21 @@ export const lists = sqliteTable(
   },
   (table) => [index("lists_owner_id_idx").on(table.ownerId)],
 );
+
+export const todos = sqliteTable(
+  "todos",
+  {
+    /** Random UUID, like List IDs. */
+    id: text("id").primaryKey(),
+    /** No `owner_id`: a Todo's Owner is its List's Owner. */
+    listId: text("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    completed: integer("completed", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("todos_list_id_idx").on(table.listId)],
+);
