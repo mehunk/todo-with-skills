@@ -7,13 +7,8 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  type List,
-  type ListWithTodos,
-  type NewList,
-  openCount,
-  type Todo,
-} from "#/todos";
+import type { List, ListWithTodos, NewList, Result, Todo } from "#/todos";
+import { restoreTodos } from "./cache";
 import {
   addTodo,
   clearCompleted,
@@ -29,6 +24,12 @@ import { listNameSchema, todoTitleSchema } from "./schemas";
 // loaders and components, and the optimistic mutations.
 
 const listsKey = ["lists"] as const;
+
+/** What a server function produced, or throws why it couldn't. */
+function unwrap<T extends object>(result: Result<T>) {
+  if (!result.ok) throw new Error(result.error);
+  return result;
+}
 
 export const listsQueryOptions = () =>
   queryOptions({ queryKey: listsKey, queryFn: () => fetchLists() });
@@ -71,9 +72,7 @@ export function useCreateList() {
 
   return useMutation({
     mutationFn: async (input: NewList) => {
-      const result = await createList({ data: input });
-      if (!result.ok) throw new Error(result.error);
-      return result.list;
+      return unwrap(await createList({ data: input })).list;
     },
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: listsKey, exact: true });
@@ -99,7 +98,7 @@ export function useCreateList() {
       queryClient.setQueryData<List[]>(listsKey, (lists) =>
         lists?.map((each) => (each.id === context.optimisticId ? list : each)),
       );
-      const created: ListWithTodos = { ...list, todos: [], openCount: 0 };
+      const created: ListWithTodos = { ...list, todos: [] };
       queryClient.setQueryData(listQueryOptions(list.id).queryKey, created);
     },
     onSettled: () =>
@@ -148,31 +147,26 @@ export function useCreateListFromName({
   };
 }
 
-/**
- * Applies `update` to the cached List (when it is loaded), keeping its open
- * count in step with its Todos.
- */
-export function updateCachedList(
+/** Applies `update` to the cached List, when it is loaded. */
+function updateCachedList(
   queryClient: QueryClient,
   listId: string,
   update: (list: ListWithTodos) => ListWithTodos,
 ) {
-  queryClient.setQueryData(listQueryOptions(listId).queryKey, (list) => {
-    if (!list) return list;
-    const updated = update(list);
-    return { ...updated, openCount: openCount(updated.todos) };
-  });
+  queryClient.setQueryData(listQueryOptions(listId).queryKey, (list) =>
+    list ? update(list) : list,
+  );
 }
 
 /**
  * An optimistic change to one List's Todos: `optimistic` applies it to the
- * cached List at once (the open count follows). If saving fails, `rollback`
- * undoes it (by default the cached List is restored as it was) and the
- * "Couldn't save" toast shows; once saved, `saved` can swap in what the
- * server returned. The List is refetched when its last pending change settles,
- * so a refetch never drops another change's optimistic Todos.
+ * cached List at once. If saving fails, `rollback` undoes only this change
+ * (given the List as it was before it, so changes that landed meanwhile
+ * survive) and the "Couldn't save" toast shows; once saved, `saved` can swap
+ * in what the server returned. The List is refetched when its last pending
+ * change settles, so a refetch never drops another change's optimistic Todos.
  */
-export function useListMutation<TVariables, TData>({
+function useListMutation<TVariables, TData>({
   listId,
   mutationFn,
   optimistic,
@@ -182,7 +176,11 @@ export function useListMutation<TVariables, TData>({
   listId: string;
   mutationFn: (variables: TVariables) => Promise<TData>;
   optimistic: (list: ListWithTodos, variables: TVariables) => ListWithTodos;
-  rollback?: (list: ListWithTodos, variables: TVariables) => ListWithTodos;
+  rollback: (
+    list: ListWithTodos,
+    variables: TVariables,
+    before: ListWithTodos,
+  ) => ListWithTodos;
   saved?: (
     list: ListWithTodos,
     data: TData,
@@ -197,19 +195,18 @@ export function useListMutation<TVariables, TData>({
     mutationFn,
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey, exact: true });
-      const previous = queryClient.getQueryData(queryKey);
+      const before = queryClient.getQueryData(queryKey);
       updateCachedList(queryClient, listId, (list) =>
         optimistic(list, variables),
       );
-      return { previous };
+      return { before };
     },
     onError: (_error, variables, context) => {
-      if (rollback) {
+      const before = context?.before;
+      if (before) {
         updateCachedList(queryClient, listId, (list) =>
-          rollback(list, variables),
+          rollback(list, variables, before),
         );
-      } else if (context) {
-        queryClient.setQueryData(queryKey, context.previous);
       }
       toast.error(SAVE_FAILED_MESSAGE);
     },
@@ -238,9 +235,7 @@ export function useAddTodo(listId: string) {
   return useListMutation({
     listId,
     mutationFn: async ({ title }: { title: string; optimisticId: string }) => {
-      const result = await addTodo({ data: { listId, title } });
-      if (!result.ok) throw new Error(result.error);
-      return result.todo;
+      return unwrap(await addTodo({ data: { listId, title } })).todo;
     },
     optimistic: (list, { title, optimisticId }) => ({
       ...list,
@@ -287,19 +282,26 @@ export function useAddTodoFromTitle(listId: string) {
 
 /**
  * Deletes a Todo optimistically: it disappears from the cached List at once
- * (the open count follows), and comes back with the "Couldn't save" toast if
- * deleting fails.
+ * (the open count follows), and comes back in its place with the
+ * "Couldn't save" toast if deleting fails.
  */
 export function useDeleteTodo(listId: string) {
   return useListMutation({
     listId,
     mutationFn: async (todoId: string) => {
-      const result = await deleteTodo({ data: { todoId } });
-      if (!result.ok) throw new Error(result.error);
+      unwrap(await deleteTodo({ data: { todoId } }));
     },
     optimistic: (list, todoId) => ({
       ...list,
       todos: list.todos.filter((todo) => todo.id !== todoId),
+    }),
+    rollback: (list, todoId, before) => ({
+      ...list,
+      todos: restoreTodos(
+        list.todos,
+        before.todos.filter((todo) => todo.id === todoId),
+        before.todos,
+      ),
     }),
   });
 }
@@ -331,9 +333,8 @@ export function useSetTodoCompleted(listId: string) {
       todoId: string;
       completed: boolean;
     }) => {
-      const result = await setTodoCompleted({ data: { todoId, completed } });
-      if (!result.ok) throw new Error(result.error);
-      return result.todo;
+      return unwrap(await setTodoCompleted({ data: { todoId, completed } }))
+        .todo;
     },
     optimistic: (list, { todoId, completed }) =>
       withCompleted(list, todoId, completed),
@@ -344,20 +345,26 @@ export function useSetTodoCompleted(listId: string) {
 
 /**
  * Clear Completed, optimistically: the List's Completed Todos disappear from
- * the cached List at once (hiding the Completed section), and the cached List
- * is restored with the "Couldn't save" toast if clearing fails.
+ * the cached List at once (hiding the Completed section), and come back in
+ * their places with the "Couldn't save" toast if clearing fails.
  */
 export function useClearCompleted(listId: string) {
   return useListMutation({
     listId,
     mutationFn: async () => {
-      const result = await clearCompleted({ data: { listId } });
-      if (!result.ok) throw new Error(result.error);
-      return result.cleared;
+      return unwrap(await clearCompleted({ data: { listId } })).cleared;
     },
     optimistic: (list) => ({
       ...list,
       todos: list.todos.filter((todo) => !todo.completed),
+    }),
+    rollback: (list, _variables, before) => ({
+      ...list,
+      todos: restoreTodos(
+        list.todos,
+        before.todos.filter((todo) => todo.completed),
+        before.todos,
+      ),
     }),
   });
 }

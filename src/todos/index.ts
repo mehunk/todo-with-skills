@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { Database } from "#/db";
 import { lists, todos } from "#/db/schema";
 import { type NewTodo, newListSchema, newTodoSchema } from "./schemas";
@@ -21,27 +21,35 @@ export type List = { id: string; name: string };
 /** A Todo as the Owner sees it. */
 export type Todo = { id: string; title: string; completed: boolean };
 
-/** A List with its Todos in creation order and how many are not Completed. */
-export type ListWithTodos = List & { todos: Todo[]; openCount: number };
+/** A List with its Todos in creation order. */
+export type ListWithTodos = List & { todos: Todo[] };
 
 /** How many of `todos` are not Completed (the header's "N open"). */
 export const openCount = (todos: readonly Todo[]) =>
   todos.filter((todo) => !todo.completed).length;
 
-/** A List with its Todos, or why the operation couldn't produce one. */
-export type ListWithTodosResult<E extends string = string> =
-  | { ok: true; list: ListWithTodos }
+/** What an operation produced (`T`), or why it couldn't (`E`). */
+export type Result<T extends object, E extends string = string> =
+  | ({ ok: true } & T)
   | { ok: false; error: E };
+
+/** A List with its Todos, or why the operation couldn't produce one. */
+export type ListWithTodosResult<E extends string = string> = Result<
+  { list: ListWithTodos },
+  E
+>;
 
 /** A Todo, or why the operation couldn't produce one. */
-export type TodoResult<E extends string = string> =
-  | { ok: true; todo: Todo }
-  | { ok: false; error: E };
+export type TodoResult<E extends string = string> = Result<{ todo: Todo }, E>;
 
 /** A List, or why the operation couldn't produce one. */
-export type ListResult<E extends string = string> =
-  | { ok: true; list: List }
-  | { ok: false; error: E };
+export type ListResult<E extends string = string> = Result<{ list: List }, E>;
+
+/** That the Todo was Deleted, or why it couldn't be. */
+export type DeleteTodoResult = Result<object, "not-found">;
+
+/** How many Todos Clear Completed Deleted, or why it couldn't. */
+export type ClearCompletedResult = Result<{ cleared: number }, "not-found">;
 
 /**
  * The Todos module: the single public interface (and test seam) for Lists and
@@ -55,6 +63,15 @@ export function createTodos(db: Database) {
       .select({ id: lists.id, name: lists.name })
       .from(lists)
       .where(and(eq(lists.ownerId, ownerId), eq(lists.id, listId)))
+      .get();
+
+  /** The Owner's Todo, or undefined when it doesn't exist or isn't theirs. */
+  const ownersTodo = (ownerId: string, todoId: string) =>
+    db
+      .select({ id: todos.id, title: todos.title })
+      .from(todos)
+      .innerJoin(lists, eq(todos.listId, lists.id))
+      .where(and(eq(todos.id, todoId), eq(lists.ownerId, ownerId)))
       .get();
 
   return {
@@ -85,7 +102,7 @@ export function createTodos(db: Database) {
         .orderBy(...creationOrder(todos));
       return {
         ok: true,
-        list: { ...list, todos: listTodos, openCount: openCount(listTodos) },
+        list: { ...list, todos: listTodos },
       };
     },
 
@@ -137,18 +154,12 @@ export function createTodos(db: Database) {
     async deleteTodo(
       ownerId: string,
       todoId: string,
-    ): Promise<{ ok: true } | { ok: false; error: "not-found" }> {
-      const ownersListIds = db
-        .select({ id: lists.id })
-        .from(lists)
-        .where(eq(lists.ownerId, ownerId));
-      const deleted = await db
-        .delete(todos)
-        .where(and(eq(todos.id, todoId), inArray(todos.listId, ownersListIds)))
-        .returning({ id: todos.id });
-      return deleted.length > 0
-        ? { ok: true }
-        : { ok: false, error: "not-found" };
+    ): Promise<DeleteTodoResult> {
+      if (!(await ownersTodo(ownerId, todoId))) {
+        return { ok: false, error: "not-found" };
+      }
+      await db.delete(todos).where(eq(todos.id, todoId));
+      return { ok: true };
     },
 
     /**
@@ -160,28 +171,21 @@ export function createTodos(db: Database) {
       todoId: string,
       completed: boolean,
     ): Promise<TodoResult<"not-found">> {
-      const todo = await db
-        .select({ id: todos.id, title: todos.title })
-        .from(todos)
-        .innerJoin(lists, eq(todos.listId, lists.id))
-        .where(and(eq(todos.id, todoId), eq(lists.ownerId, ownerId)))
-        .get();
+      const todo = await ownersTodo(ownerId, todoId);
       if (!todo) return { ok: false, error: "not-found" };
       await db.update(todos).set({ completed }).where(eq(todos.id, todoId));
       return { ok: true, todo: { ...todo, completed } };
     },
 
     /**
-     * Clear Completed: permanently removes every Completed Todo in the
-     * Owner's List and returns how many it removed. An unknown or another
+     * Clear Completed: Deletes every Completed Todo in the Owner's List
+     * permanently and returns how many it Deleted. An unknown or another
      * Owner's List is reported as not found and left unchanged.
      */
     async clearCompleted(
       ownerId: string,
       listId: string,
-    ): Promise<
-      { ok: true; cleared: number } | { ok: false; error: "not-found" }
-    > {
+    ): Promise<ClearCompletedResult> {
       if (!(await ownersList(ownerId, listId))) {
         return { ok: false, error: "not-found" };
       }

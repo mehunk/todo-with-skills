@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { createDb } from "#/db";
-import { createTodos } from "#/todos";
+import { createTodos, openCount } from "#/todos";
 
 const ALICE = "user_alice";
 const BOB = "user_bob";
@@ -80,12 +80,12 @@ describe("listLists", () => {
 });
 
 describe("getList", () => {
-  it("returns the Owner's new List, with no Todos and none open", async () => {
+  it("returns the Owner's new List, with no Todos", async () => {
     const list = await createdList(ALICE, "Groceries");
 
     expect(await todos().getList(ALICE, list.id)).toEqual({
       ok: true,
-      list: { ...list, todos: [], openCount: 0 },
+      list: { ...list, todos: [] },
     });
   });
 
@@ -128,7 +128,7 @@ describe("addTodo", () => {
 
     expect(result).toEqual({ ok: false, error: "Enter a Todo title" });
     expect(await todos().getList(ALICE, list.id)).toMatchObject({
-      list: { todos: [], openCount: 0 },
+      list: { todos: [] },
     });
   });
 
@@ -174,13 +174,13 @@ describe("addTodo", () => {
 
     expect(result).toEqual({ ok: false, error: "not-found" });
     expect(await todos().getList(BOB, bobs.id)).toMatchObject({
-      list: { todos: [], openCount: 0 },
+      list: { todos: [] },
     });
   });
 });
 
 describe("deleteTodo", () => {
-  it("removes only that Todo; the List's other Todos remain", async () => {
+  it("deletes only that Todo; the List's other Todos remain", async () => {
     const list = await createdList(ALICE, "Groceries");
     const milk = await addedTodo(ALICE, list.id, "Milk");
     const eggs = await addedTodo(ALICE, list.id, "Eggs");
@@ -189,7 +189,7 @@ describe("deleteTodo", () => {
     expect(await todos().deleteTodo(ALICE, eggs.id)).toEqual({ ok: true });
 
     expect(await todos().getList(ALICE, list.id)).toMatchObject({
-      list: { todos: [milk, bread], openCount: 2 },
+      list: { todos: [milk, bread] },
     });
   });
 
@@ -220,7 +220,7 @@ describe("deleteTodo", () => {
       error: "not-found",
     });
     expect(await todos().getList(BOB, bobs.id)).toMatchObject({
-      list: { todos: [milk], openCount: 1 },
+      list: { todos: [milk] },
     });
   });
 });
@@ -243,14 +243,14 @@ describe("getList with Todos", () => {
 
   it("counts the Todos that are not Completed as open", async () => {
     const list = await createdList(ALICE, "Groceries");
-    await addedTodo(ALICE, list.id, "Milk");
+    const milk = await addedTodo(ALICE, list.id, "Milk");
     await addedTodo(ALICE, list.id, "Eggs");
     await addedTodo(ALICE, list.id, "Bread");
+    await todos().setCompleted(ALICE, milk.id, true);
 
-    expect(await todos().getList(ALICE, list.id)).toMatchObject({
-      ok: true,
-      list: { openCount: 3 },
-    });
+    const result = await todos().getList(ALICE, list.id);
+
+    expect(result.ok && openCount(result.list.todos)).toBe(2);
   });
 
   it("returns only that List's Todos", async () => {
@@ -260,10 +260,10 @@ describe("getList with Todos", () => {
     const report = await addedTodo(ALICE, work.id, "Report");
 
     expect(await todos().getList(ALICE, groceries.id)).toMatchObject({
-      list: { todos: [milk], openCount: 1 },
+      list: { todos: [milk] },
     });
     expect(await todos().getList(ALICE, work.id)).toMatchObject({
-      list: { todos: [report], openCount: 1 },
+      list: { todos: [report] },
     });
   });
 });
@@ -278,7 +278,7 @@ describe("setCompleted", () => {
 
     expect(result).toEqual({ ok: true, todo: { ...milk, completed: true } });
     expect(await todos().getList(ALICE, list.id)).toMatchObject({
-      list: { todos: [{ ...milk, completed: true }, eggs], openCount: 1 },
+      list: { todos: [{ ...milk, completed: true }, eggs] },
     });
   });
 
@@ -293,7 +293,7 @@ describe("setCompleted", () => {
 
     expect(result).toEqual({ ok: true, todo: eggs });
     expect(await todos().getList(ALICE, list.id)).toMatchObject({
-      list: { todos: [milk, eggs, bread], openCount: 3 },
+      list: { todos: [milk, eggs, bread] },
     });
   });
 
@@ -309,7 +309,7 @@ describe("setCompleted", () => {
 
     expect(result).toEqual({ ok: true, todo: { ...milk, completed } });
     expect(await todos().getList(ALICE, list.id)).toMatchObject({
-      list: { todos: [{ ...milk, completed }], openCount: completed ? 0 : 1 },
+      list: { todos: [{ ...milk, completed }] },
     });
   });
 
@@ -327,7 +327,7 @@ describe("setCompleted", () => {
 
     expect(result).toEqual({ ok: false, error: "not-found" });
     expect(await todos().getList(BOB, bobs.id)).toMatchObject({
-      list: { todos: [milk], openCount: 1 },
+      list: { todos: [milk] },
     });
   });
 });
@@ -345,7 +345,7 @@ describe("clearCompleted", () => {
 
     expect(result).toEqual({ ok: true, cleared: 2 });
     expect(await todos().getList(ALICE, list.id)).toMatchObject({
-      list: { todos: [eggs], openCount: 1 },
+      list: { todos: [eggs] },
     });
   });
 
@@ -361,7 +361,7 @@ describe("clearCompleted", () => {
 
     expect(result).toEqual({ ok: true, cleared: 1 });
     expect(await todos().getList(ALICE, work.id)).toMatchObject({
-      list: { todos: [{ ...report, completed: true }], openCount: 0 },
+      list: { todos: [{ ...report, completed: true }] },
     });
   });
 

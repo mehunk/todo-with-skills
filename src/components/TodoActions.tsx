@@ -17,8 +17,9 @@ type TodoActionsProps = {
 /**
  * A Todo row's actions, for `TodoRow`'s `actions` slot (docs/ui.md). From
  * `md` up, a Delete icon button that fades in while the row is hovered (or
- * holds focus); below `md`, an always-visible `⋯` menu holding Delete, with a
- * 44px tap target.
+ * holds focus), and is always visible on touch screens (coarse pointer), with
+ * a 44px tap target there; below `md`, an always-visible `⋯` menu holding
+ * Delete, with a 44px tap target.
  */
 export function TodoActions({ todoTitle, onDelete }: TodoActionsProps) {
   return (
@@ -28,7 +29,7 @@ export function TodoActions({ todoTitle, onDelete }: TodoActionsProps) {
         size="icon-sm"
         aria-label={`Delete ${todoTitle}`}
         onClick={onDelete}
-        className="hidden text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-destructive md:inline-flex"
+        className="relative hidden text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-destructive md:inline-flex pointer-coarse:opacity-100 pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5"
       >
         <Trash2 />
       </Button>

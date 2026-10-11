@@ -1,5 +1,6 @@
 import { ChevronRightIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
+import { Button } from "#/components/ui/button";
 import { cn } from "#/lib/utils";
 import { ClearCompleted } from "./ClearCompleted";
 
@@ -37,12 +38,13 @@ export function CompletedSection({
   return (
     <section className={cn("flex flex-col", className)}>
       <div className="flex min-h-11 items-center justify-between gap-2 border-b px-4 sm:min-h-10">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           aria-expanded={expanded}
           aria-controls={contentId}
           onClick={() => setExpanded((was) => !was)}
-          className="-ml-1 flex min-h-11 items-center gap-1.5 rounded-md px-1 text-xs text-muted-foreground tabular-nums outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:min-h-8"
+          className="-ml-1 min-h-11 gap-1.5 px-1 text-xs font-normal text-muted-foreground tabular-nums hover:bg-transparent hover:text-foreground has-[>svg]:px-1 sm:min-h-8 dark:hover:bg-transparent"
         >
           <ChevronRightIcon
             aria-hidden
@@ -52,7 +54,7 @@ export function CompletedSection({
             )}
           />
           Completed ({count})
-        </button>
+        </Button>
         {onClearCompleted && (
           <ClearCompleted count={count} onConfirm={onClearCompleted} />
         )}

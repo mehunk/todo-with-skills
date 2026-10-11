@@ -5,6 +5,7 @@ import { LandingPage, loadIfSignedIn } from "#/components/LandingPage";
 import { ListHeader } from "#/components/ListHeader";
 import { ListsSidebar } from "#/components/ListsSidebar";
 import { ListTodos } from "#/components/ListTodos";
+import { openCount } from "#/todos";
 import { listQueryOptions, listsQueryOptions } from "#/todos/queries";
 
 export const Route = createFileRoute("/lists/$listId")({
@@ -39,6 +40,9 @@ function SelectedListHeader() {
   const { listId } = Route.useParams();
   const { data: list } = useSuspenseQuery(listQueryOptions(listId));
   return (
-    <ListHeader name={list?.name ?? ""} openCount={list?.openCount ?? 0} />
+    <ListHeader
+      name={list?.name ?? ""}
+      openCount={openCount(list?.todos ?? [])}
+    />
   );
 }

@@ -1,38 +1,15 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "./support/fixtures";
-import {
-  createListFromSidebar,
-  listTitle,
-  signInToAList,
-} from "./support/lists";
-
-/** The selected List's Todo rows, in the order shown. */
-const todoRows = (page: Page) =>
-  page.getByRole("list", { name: "Todos" }).getByRole("listitem");
-
-/** The header's "N open" count. */
-const openCount = (page: Page) =>
-  page.getByRole("main").getByText(/^\d+ open$/);
+import { addTodo, openCount, openNewList, todoRows } from "./support/todos";
 
 test("an Owner Deletes one Todo; it is gone, also after a reload, and the others remain", async ({
   page,
   testData,
 }) => {
-  // A new, uniquely named List of this test's own (the shared E2E user's
-  // other Lists may hold anything).
-  await signInToAList(page, testData.uniqueName);
-  const name = testData.uniqueName("Delete");
-  await createListFromSidebar(page, name);
-  await expect(listTitle(page)).toHaveText(name);
-
+  await openNewList(page, testData, "Delete");
   const [milk, eggs, bread] = ["Milk", "Eggs", "Bread"].map((title) =>
     testData.uniqueName(title),
   );
-  const addTodo = page.getByRole("textbox", { name: "Add Todo" });
-  for (const title of [milk, eggs, bread]) {
-    await addTodo.fill(title);
-    await addTodo.press("Enter");
-  }
+  for (const title of [milk, eggs, bread]) await addTodo(page, title);
   await expect(todoRows(page)).toHaveText([milk, eggs, bread]);
   await expect(openCount(page)).toHaveText("3 open");
 
@@ -46,4 +23,27 @@ test("an Owner Deletes one Todo; it is gone, also after a reload, and the others
   await page.reload();
   await expect(todoRows(page)).toHaveText([milk, bread]);
   await expect(openCount(page)).toHaveText("2 open");
+});
+
+test.describe("on a touch tablet", () => {
+  // At least `md` wide, but a coarse pointer with no hover (docs/ui.md).
+  test.use({
+    viewport: { width: 1024, height: 768 },
+    hasTouch: true,
+    isMobile: true,
+  });
+
+  test("the Delete action is always visible, without hovering", async ({
+    page,
+    testData,
+  }) => {
+    await openNewList(page, testData, "Touch Delete");
+    const milk = testData.uniqueName("Milk");
+    await addTodo(page, milk);
+
+    const deleteMilk = page.getByRole("button", { name: `Delete ${milk}` });
+    await expect(deleteMilk).toHaveCSS("opacity", "1");
+    await deleteMilk.tap();
+    await expect(todoRows(page)).toHaveCount(0);
+  });
 });
