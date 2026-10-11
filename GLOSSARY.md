@@ -24,6 +24,14 @@ _Avoid_: Deadline, due time
 A Todo the Owner has marked done. Completion can be undone.
 _Avoid_: Done, finished, checked, archived
 
+**Delete**:
+Permanently removing a single Todo from its List.
+_Avoid_: Remove, clear, archive
+
+**Clear Completed**:
+Permanently removing every Completed Todo in one List at once.
+_Avoid_: Clean up, purge, archive
+
 **Overdue**:
 A Todo that is not Completed and whose Due date is before the Owner's current local date.
 _Avoid_: Late, expired

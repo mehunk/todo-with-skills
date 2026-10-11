@@ -27,7 +27,10 @@ export const fetchLists = createServerFn({ method: "GET" }).handler(
   },
 );
 
-/** The Owner's List, or null when it doesn't exist or isn't theirs. */
+/**
+ * The Owner's List with its Todos, or null when it doesn't exist or isn't
+ * theirs.
+ */
 export const fetchList = createServerFn({ method: "GET" })
   .inputValidator(z.object({ listId: z.string() }))
   .handler(async ({ data }) => {
@@ -41,4 +44,32 @@ export const createList = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { ownerId, todos } = await ownerTodos();
     return todos.createList(ownerId, data);
+  });
+
+export const addTodo = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ listId: z.string(), title: z.string() }))
+  .handler(async ({ data }) => {
+    const { ownerId, todos } = await ownerTodos();
+    return todos.addTodo(ownerId, data.listId, { title: data.title });
+  });
+
+export const deleteTodo = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ todoId: z.string() }))
+  .handler(async ({ data }) => {
+    const { ownerId, todos } = await ownerTodos();
+    return todos.deleteTodo(ownerId, data.todoId);
+  });
+
+export const setTodoCompleted = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ todoId: z.string(), completed: z.boolean() }))
+  .handler(async ({ data }) => {
+    const { ownerId, todos } = await ownerTodos();
+    return todos.setCompleted(ownerId, data.todoId, data.completed);
+  });
+
+export const clearCompleted = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ listId: z.string() }))
+  .handler(async ({ data }) => {
+    const { ownerId, todos } = await ownerTodos();
+    return todos.clearCompleted(ownerId, data.listId);
   });

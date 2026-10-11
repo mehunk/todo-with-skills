@@ -17,3 +17,18 @@ export const listNameSchema = z
 export const newListSchema = z.object({ name: listNameSchema });
 
 export type NewList = z.input<typeof newListSchema>;
+
+export const TODO_TITLE_MAX_LENGTH = 500;
+
+export const todoTitleSchema = z
+  .string()
+  .trim()
+  .min(1, "Enter a Todo title")
+  .max(
+    TODO_TITLE_MAX_LENGTH,
+    `Todo titles can be at most ${TODO_TITLE_MAX_LENGTH} characters`,
+  );
+
+export const newTodoSchema = z.object({ title: todoTitleSchema });
+
+export type NewTodo = z.input<typeof newTodoSchema>;

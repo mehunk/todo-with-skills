@@ -1,34 +1,14 @@
 import { randomUUID } from "node:crypto";
-import type { Page } from "@playwright/test";
 import { signIn } from "./support/auth";
 import { expect, test } from "./support/fixtures";
-
-const LIST_PATH = /\/lists\/[0-9a-f-]{36}$/;
-
-const listTitle = (page: Page) =>
-  page.getByRole("main").getByRole("heading", { level: 1 });
-
-/** The sidebar's List rows: the desktop sidebar card (not the mobile drawer). */
-const sidebarLists = (page: Page) =>
-  page.getByRole("navigation", { name: "My Lists" }).getByRole("button");
-
-/**
- * After signing in at /, waits until the Owner has either been sent to a List
- * or shown the "No Lists" empty state (the shared E2E user may have no Lists
- * yet). True for the empty state.
- */
-async function showsNoLists(page: Page) {
-  const createFirst = page.getByRole("heading", {
-    name: "Create your first List",
-  });
-  await expect(async () => {
-    const landed =
-      LIST_PATH.test(new URL(page.url()).pathname) ||
-      (await createFirst.isVisible());
-    expect(landed).toBe(true);
-  }).toPass();
-  return createFirst.isVisible();
-}
+import {
+  createListFromSidebar,
+  LIST_PATH,
+  listTitle,
+  showsNoLists,
+  sidebarLists,
+  signInToAList,
+} from "./support/lists";
 
 test("an Owner opening / lands on a List and stays on it after a reload", async ({
   page,
@@ -84,22 +64,6 @@ test("a signed-out visitor opening a List address sees the landing page", async 
   ).toBeVisible();
 });
 
-/**
- * Signs in and makes sure the shared E2E user has at least one List, creating
- * one from the "No Lists" empty state if needed. Ends on a List page.
- */
-async function signInToAList(page: Page, uniqueName: (name: string) => string) {
-  await page.goto("/");
-  await signIn(page);
-  if (await showsNoLists(page)) {
-    await page
-      .getByRole("textbox", { name: "List name" })
-      .fill(uniqueName("Sidebar List"));
-    await page.keyboard.press("Enter");
-  }
-  await expect(page).toHaveURL(LIST_PATH);
-}
-
 test("clicking a List in the sidebar opens it, and back returns to the previous List", async ({
   page,
   testData,
@@ -149,15 +113,6 @@ test("on a phone, selecting a List closes the drawer", async ({
   await expect(drawer).toBeHidden();
   await expect(listTitle(page)).toHaveText(name);
 });
-
-/** Opens the sidebar's new-List input, types `name` and presses Enter. */
-async function createListFromSidebar(page: Page, name: string) {
-  await page.getByRole("button", { name: "New List" }).click();
-  const input = page.getByRole("textbox", { name: "List name" });
-  await expect(input).toBeFocused();
-  await input.fill(name);
-  await input.press("Enter");
-}
 
 test("an Owner creates two Lists from the sidebar and switches between them", async ({
   page,
