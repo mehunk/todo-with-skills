@@ -16,6 +16,7 @@ import {
 } from "#/todos";
 import {
   addTodo,
+  clearCompleted,
   createList,
   deleteTodo,
   fetchList,
@@ -338,5 +339,25 @@ export function useSetTodoCompleted(listId: string) {
       withCompleted(list, todoId, completed),
     rollback: (list, { todoId, completed }) =>
       withCompleted(list, todoId, !completed),
+  });
+}
+
+/**
+ * Clear Completed, optimistically: the List's Completed Todos disappear from
+ * the cached List at once (hiding the Completed section), and the cached List
+ * is restored with the "Couldn't save" toast if clearing fails.
+ */
+export function useClearCompleted(listId: string) {
+  return useListMutation({
+    listId,
+    mutationFn: async () => {
+      const result = await clearCompleted({ data: { listId } });
+      if (!result.ok) throw new Error(result.error);
+      return result.cleared;
+    },
+    optimistic: (list) => ({
+      ...list,
+      todos: list.todos.filter((todo) => !todo.completed),
+    }),
   });
 }

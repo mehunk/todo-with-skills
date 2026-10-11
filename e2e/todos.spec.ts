@@ -201,3 +201,47 @@ test("the Completed section is expanded by default and collapses and expands", a
   await expect(completedToggle(page)).toHaveAttribute("aria-expanded", "true");
   await expect(completedRows(page)).toHaveText([milk, eggs]);
 });
+
+test("an Owner clears the Completed Todos after confirming; Cancel removes nothing", async ({
+  page,
+  testData,
+}) => {
+  await openNewList(page, testData, "Clear Completed");
+  const [milk, eggs, bread] = ["Milk", "Eggs", "Bread"].map((title) =>
+    testData.uniqueName(title),
+  );
+  for (const title of [milk, eggs, bread]) await addTodo(page, title);
+  await todoCheckbox(page, milk).check();
+  await todoCheckbox(page, bread).check();
+  await expect(completedRows(page)).toHaveText([milk, bread]);
+
+  // While the dialog is open, the page behind it is hidden from the
+  // accessibility tree, so this finds only the dialog's confirm button.
+  const clearCompleted = page.getByRole("button", {
+    name: "Clear Completed",
+    exact: true,
+  });
+  const dialog = page.getByRole("dialog", { name: "Clear Completed?" });
+
+  await clearCompleted.click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(completedToggle(page)).toHaveText("Completed (2)");
+  await expect(completedRows(page)).toHaveText([milk, bread]);
+  await expect(todoRows(page)).toHaveText([eggs]);
+
+  await clearCompleted.click();
+  await dialog
+    .getByRole("button", { name: "Clear Completed", exact: true })
+    .click();
+  await expect(dialog).toBeHidden();
+  await expect(completedToggle(page)).toBeHidden();
+  await expect(clearCompleted).toBeHidden();
+  await expect(todoRows(page)).toHaveText([eggs]);
+  await expect(openCount(page)).toHaveText("1 open");
+
+  await page.reload();
+  await expect(todoRows(page)).toHaveText([eggs]);
+  await expect(completedToggle(page)).toBeHidden();
+});

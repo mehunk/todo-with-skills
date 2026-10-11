@@ -66,3 +66,10 @@ export const setTodoCompleted = createServerFn({ method: "POST" })
     const { ownerId, todos } = await ownerTodos();
     return todos.setCompleted(ownerId, data.todoId, data.completed);
   });
+
+export const clearCompleted = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ listId: z.string() }))
+  .handler(async ({ data }) => {
+    const { ownerId, todos } = await ownerTodos();
+    return todos.clearCompleted(ownerId, data.listId);
+  });

@@ -4,6 +4,7 @@ import {
   isTodoSaving,
   listQueryOptions,
   useAddTodoFromTitle,
+  useClearCompleted,
   useDeleteTodo,
   useSetTodoCompleted,
 } from "#/todos/queries";
@@ -25,6 +26,7 @@ export function ListTodos({ listId }: { listId: string }) {
   const addTodo = useAddTodoFromTitle(listId);
   const deleteTodo = useDeleteTodo(listId);
   const setCompleted = useSetTodoCompleted(listId);
+  const clearCompleted = useClearCompleted(listId);
   const todos = list?.todos ?? [];
   const openTodos = todos.filter((todo) => !todo.completed);
   const completedTodos = todos.filter((todo) => todo.completed);
@@ -60,7 +62,10 @@ export function ListTodos({ listId }: { listId: string }) {
       />
       {todos.length === 0 && <EmptyList />}
       {completedTodos.length > 0 && (
-        <CompletedSection count={completedTodos.length}>
+        <CompletedSection
+          count={completedTodos.length}
+          onClearCompleted={() => clearCompleted.mutate()}
+        >
           <ul aria-label="Completed">{completedTodos.map(row)}</ul>
         </CompletedSection>
       )}

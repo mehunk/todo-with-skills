@@ -1,6 +1,7 @@
 import { ChevronRightIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { cn } from "#/lib/utils";
+import { ClearCompleted } from "./ClearCompleted";
 
 type CompletedSectionProps = {
   /** How many Todos are Completed: the toggle reads "Completed (N)". */
@@ -9,18 +10,25 @@ type CompletedSectionProps = {
   children: ReactNode;
   /** Expanded at first (docs/ui.md: expanded by default). */
   defaultExpanded?: boolean;
+  /**
+   * Clears the Completed Todos once the Owner confirms; shows the
+   * "Clear Completed" button beside the toggle.
+   */
+  onClearCompleted?: () => void;
   className?: string;
 };
 
 /**
  * The Completed section below the Todo table (docs/ui.md Layout): a
  * "Completed (N)" toggle, expanded by default, that collapses and expands the
- * Completed Todos. Callers hide it when there are no Completed Todos.
+ * Completed Todos, with "Clear Completed" beside it. Callers hide it when
+ * there are no Completed Todos.
  */
 export function CompletedSection({
   count,
   children,
   defaultExpanded = true,
+  onClearCompleted,
   className,
 }: CompletedSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -28,7 +36,7 @@ export function CompletedSection({
 
   return (
     <section className={cn("flex flex-col", className)}>
-      <div className="flex min-h-11 items-center border-b px-4 sm:min-h-10">
+      <div className="flex min-h-11 items-center justify-between gap-2 border-b px-4 sm:min-h-10">
         <button
           type="button"
           aria-expanded={expanded}
@@ -45,6 +53,9 @@ export function CompletedSection({
           />
           Completed ({count})
         </button>
+        {onClearCompleted && (
+          <ClearCompleted count={count} onConfirm={onClearCompleted} />
+        )}
       </div>
       <div id={contentId} hidden={!expanded}>
         {expanded && children}

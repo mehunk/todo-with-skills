@@ -53,3 +53,18 @@ export const ExpandedDark: Story = { parameters: dark };
 export const Collapsed: Story = { args: { defaultExpanded: false } };
 
 export const CollapsedDark: Story = { ...Collapsed, parameters: dark };
+
+/** With "Clear Completed" beside the toggle, as in a List. */
+export const WithClearCompleted: Story = {
+  args: { onClearCompleted: fn() },
+};
+
+export const WithClearCompletedDark: Story = {
+  ...WithClearCompleted,
+  parameters: dark,
+};
+
+/** Collapsed, still with "Clear Completed" beside the toggle. */
+export const CollapsedWithClearCompleted: Story = {
+  args: { defaultExpanded: false, onClearCompleted: fn() },
+};
