@@ -80,10 +80,13 @@ describe("listLists", () => {
 });
 
 describe("getList", () => {
-  it("returns the Owner's List", async () => {
+  it("returns the Owner's new List, with no Todos and none open", async () => {
     const list = await createdList(ALICE, "Groceries");
 
-    expect(await todos().getList(ALICE, list.id)).toEqual({ ok: true, list });
+    expect(await todos().getList(ALICE, list.id)).toEqual({
+      ok: true,
+      list: { ...list, todos: [], openCount: 0 },
+    });
   });
 
   it("reports not found for an unknown ID", async () => {
@@ -102,6 +105,128 @@ describe("getList", () => {
     });
   });
 });
+
+describe("addTodo", () => {
+  it("adds a Todo with the trimmed title, not Completed", async () => {
+    const list = await createdList(ALICE, "Groceries");
+
+    const result = await todos().addTodo(ALICE, list.id, { title: "  Milk  " });
+
+    expect(result).toEqual({
+      ok: true,
+      todo: { id: expect.any(String), title: "Milk", completed: false },
+    });
+  });
+
+  it.each([
+    ["an empty", ""],
+    ["a whitespace-only", "   "],
+  ])("rejects %s title and adds nothing", async (_, title) => {
+    const list = await createdList(ALICE, "Groceries");
+
+    const result = await todos().addTodo(ALICE, list.id, { title });
+
+    expect(result).toEqual({ ok: false, error: "Enter a Todo title" });
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      list: { todos: [], openCount: 0 },
+    });
+  });
+
+  it("rejects a title longer than 500 characters and adds nothing", async () => {
+    const list = await createdList(ALICE, "Groceries");
+
+    const result = await todos().addTodo(ALICE, list.id, {
+      title: "a".repeat(501),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Todo titles can be at most 500 characters",
+    });
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      list: { todos: [] },
+    });
+  });
+
+  it("accepts a title of exactly 500 characters, after trimming", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    const title = "a".repeat(500);
+
+    const result = await todos().addTodo(ALICE, list.id, {
+      title: ` ${title} `,
+    });
+
+    expect(result).toMatchObject({ ok: true, todo: { title } });
+  });
+
+  it("reports not found for an unknown List", async () => {
+    const result = await todos().addTodo(ALICE, crypto.randomUUID(), {
+      title: "Milk",
+    });
+
+    expect(result).toEqual({ ok: false, error: "not-found" });
+  });
+
+  it("reports not found for another Owner's List and adds nothing", async () => {
+    const bobs = await createdList(BOB, "Bob's");
+
+    const result = await todos().addTodo(ALICE, bobs.id, { title: "Milk" });
+
+    expect(result).toEqual({ ok: false, error: "not-found" });
+    expect(await todos().getList(BOB, bobs.id)).toMatchObject({
+      list: { todos: [], openCount: 0 },
+    });
+  });
+});
+
+describe("getList with Todos", () => {
+  it("returns the List's Todos in creation order", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    const titles = ["Milk", "Eggs", "Bread", "Apples", "Coffee"];
+    const added = [];
+    for (const title of titles) {
+      added.push(await addedTodo(ALICE, list.id, title));
+    }
+
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      ok: true,
+      list: { todos: added },
+    });
+    expect(added.map((todo) => todo.title)).toEqual(titles);
+  });
+
+  it("counts the Todos that are not Completed as open", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    await addedTodo(ALICE, list.id, "Milk");
+    await addedTodo(ALICE, list.id, "Eggs");
+    await addedTodo(ALICE, list.id, "Bread");
+
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      ok: true,
+      list: { openCount: 3 },
+    });
+  });
+
+  it("returns only that List's Todos", async () => {
+    const groceries = await createdList(ALICE, "Groceries");
+    const work = await createdList(ALICE, "Work");
+    const milk = await addedTodo(ALICE, groceries.id, "Milk");
+    const report = await addedTodo(ALICE, work.id, "Report");
+
+    expect(await todos().getList(ALICE, groceries.id)).toMatchObject({
+      list: { todos: [milk], openCount: 1 },
+    });
+    expect(await todos().getList(ALICE, work.id)).toMatchObject({
+      list: { todos: [report], openCount: 1 },
+    });
+  });
+});
+
+async function addedTodo(ownerId: string, listId: string, title: string) {
+  const result = await todos().addTodo(ownerId, listId, { title });
+  if (!result.ok) throw new Error(result.error);
+  return result.todo;
+}
 
 async function createdList(ownerId: string, name: string) {
   const result = await todos().createList(ownerId, { name });
