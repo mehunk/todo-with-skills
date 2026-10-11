@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "storybook/test";
+import { fn, within } from "storybook/test";
+import { TodoActions } from "./TodoActions";
 import { TodoRow } from "./TodoRow";
 
 const meta = {
@@ -54,3 +55,31 @@ export const Phone: Story = {
 };
 
 export const PhoneDark: Story = { ...Phone, parameters: dark };
+
+const deleteAction = (
+  <TodoActions todoTitle="Buy oat milk" onDelete={fn().mockName("onDelete")} />
+);
+
+/**
+ * Hovered on desktop: `bg-muted/50`, and the Delete action fades in. CSS
+ * hover can't be forced in a story, so the row gets the hover background and
+ * Delete holds focus, which reveals it the same way.
+ */
+export const Hover: Story = {
+  args: { actions: deleteAction, className: "bg-muted/50" },
+  play: async ({ canvasElement }) => {
+    within(canvasElement)
+      .getByRole("button", { name: "Delete Buy oat milk" })
+      .focus();
+  },
+};
+
+export const HoverDark: Story = { ...Hover, parameters: dark };
+
+/** On a phone a per-row `⋯` menu, always visible, holds Delete. */
+export const Mobile: Story = {
+  args: { actions: deleteAction },
+  globals: { viewport: { value: "mobile1" } },
+};
+
+export const MobileDark: Story = { ...Mobile, parameters: dark };

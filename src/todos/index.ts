@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "#/db";
 import { lists, todos } from "#/db/schema";
 import { type NewTodo, newListSchema, newTodoSchema } from "./schemas";
@@ -128,6 +128,27 @@ export function createTodos(db: Database) {
       };
       await db.insert(todos).values({ ...todo, listId, createdAt: new Date() });
       return { ok: true, todo };
+    },
+
+    /**
+     * Deletes the Owner's Todo permanently, or reports that it is not found
+     * (unknown, already Deleted, or in another Owner's List).
+     */
+    async deleteTodo(
+      ownerId: string,
+      todoId: string,
+    ): Promise<{ ok: true } | { ok: false; error: "not-found" }> {
+      const ownersListIds = db
+        .select({ id: lists.id })
+        .from(lists)
+        .where(eq(lists.ownerId, ownerId));
+      const deleted = await db
+        .delete(todos)
+        .where(and(eq(todos.id, todoId), inArray(todos.listId, ownersListIds)))
+        .returning({ id: todos.id });
+      return deleted.length > 0
+        ? { ok: true }
+        : { ok: false, error: "not-found" };
     },
   };
 }

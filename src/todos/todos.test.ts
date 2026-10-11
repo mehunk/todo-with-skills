@@ -179,6 +179,52 @@ describe("addTodo", () => {
   });
 });
 
+describe("deleteTodo", () => {
+  it("removes only that Todo; the List's other Todos remain", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    const milk = await addedTodo(ALICE, list.id, "Milk");
+    const eggs = await addedTodo(ALICE, list.id, "Eggs");
+    const bread = await addedTodo(ALICE, list.id, "Bread");
+
+    expect(await todos().deleteTodo(ALICE, eggs.id)).toEqual({ ok: true });
+
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      list: { todos: [milk, bread], openCount: 2 },
+    });
+  });
+
+  it("reports not found for an unknown Todo", async () => {
+    expect(await todos().deleteTodo(ALICE, crypto.randomUUID())).toEqual({
+      ok: false,
+      error: "not-found",
+    });
+  });
+
+  it("reports not found for a Todo already Deleted", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    const milk = await addedTodo(ALICE, list.id, "Milk");
+    await todos().deleteTodo(ALICE, milk.id);
+
+    expect(await todos().deleteTodo(ALICE, milk.id)).toEqual({
+      ok: false,
+      error: "not-found",
+    });
+  });
+
+  it("reports not found for another Owner's Todo and leaves it unchanged", async () => {
+    const bobs = await createdList(BOB, "Bob's");
+    const milk = await addedTodo(BOB, bobs.id, "Milk");
+
+    expect(await todos().deleteTodo(ALICE, milk.id)).toEqual({
+      ok: false,
+      error: "not-found",
+    });
+    expect(await todos().getList(BOB, bobs.id)).toMatchObject({
+      list: { todos: [milk], openCount: 1 },
+    });
+  });
+});
+
 describe("getList with Todos", () => {
   it("returns the List's Todos in creation order", async () => {
     const list = await createdList(ALICE, "Groceries");

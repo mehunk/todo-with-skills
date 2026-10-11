@@ -14,7 +14,13 @@ import {
   openCount,
   type Todo,
 } from "#/todos";
-import { addTodo, createList, fetchList, fetchLists } from "./functions";
+import {
+  addTodo,
+  createList,
+  deleteTodo,
+  fetchList,
+  fetchLists,
+} from "./functions";
 import { listNameSchema, todoTitleSchema } from "./schemas";
 
 // TanStack Query wiring for Lists and Todos: query options shared by route
@@ -275,4 +281,23 @@ export function useAddTodoFromTitle(listId: string) {
   };
 
   return { add, error, clearError: () => setError(undefined) };
+}
+
+/**
+ * Deletes a Todo optimistically: it disappears from the cached List at once
+ * (the open count follows), and comes back with the "Couldn't save" toast if
+ * deleting fails.
+ */
+export function useDeleteTodo(listId: string) {
+  return useListMutation({
+    listId,
+    mutationFn: async (todoId: string) => {
+      const result = await deleteTodo({ data: { todoId } });
+      if (!result.ok) throw new Error(result.error);
+    },
+    optimistic: (list, todoId) => ({
+      ...list,
+      todos: list.todos.filter((todo) => todo.id !== todoId),
+    }),
+  });
 }

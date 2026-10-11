@@ -3,9 +3,11 @@ import {
   isTodoSaving,
   listQueryOptions,
   useAddTodoFromTitle,
+  useDeleteTodo,
 } from "#/todos/queries";
 import { AddTodoRow } from "./AddTodoRow";
 import { EmptyList } from "./EmptyList";
+import { TodoActions } from "./TodoActions";
 import { TodoRow } from "./TodoRow";
 
 /**
@@ -17,6 +19,7 @@ import { TodoRow } from "./TodoRow";
 export function ListTodos({ listId }: { listId: string }) {
   const { data: list } = useSuspenseQuery(listQueryOptions(listId));
   const addTodo = useAddTodoFromTitle(listId);
+  const deleteTodo = useDeleteTodo(listId);
   const todos = list?.todos ?? [];
 
   return (
@@ -25,7 +28,19 @@ export function ListTodos({ listId }: { listId: string }) {
         <ul aria-label="Todos">
           {todos.map((todo) => (
             <li key={todo.id}>
-              <TodoRow todo={todo} saving={isTodoSaving(todo)} />
+              <TodoRow
+                todo={todo}
+                saving={isTodoSaving(todo)}
+                actions={
+                  // A Todo still saving has no server ID to Delete yet.
+                  !isTodoSaving(todo) && (
+                    <TodoActions
+                      todoTitle={todo.title}
+                      onDelete={() => deleteTodo.mutate(todo.id)}
+                    />
+                  )
+                }
+              />
             </li>
           ))}
         </ul>
