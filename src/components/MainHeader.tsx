@@ -1,6 +1,6 @@
 /**
- * The main card header title: the selected List's name, or the app name when
- * no List is selected.
+ * The main card header title when no List is selected (the "No Lists" empty
+ * state). A selected List uses ListHeader.
  */
 export function MainHeader({ title }: { title: string }) {
   return (
