@@ -332,6 +332,71 @@ describe("setCompleted", () => {
   });
 });
 
+describe("clearCompleted", () => {
+  it("removes only the Completed Todos and returns how many it removed", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    const milk = await addedTodo(ALICE, list.id, "Milk");
+    const eggs = await addedTodo(ALICE, list.id, "Eggs");
+    const bread = await addedTodo(ALICE, list.id, "Bread");
+    await todos().setCompleted(ALICE, milk.id, true);
+    await todos().setCompleted(ALICE, bread.id, true);
+
+    const result = await todos().clearCompleted(ALICE, list.id);
+
+    expect(result).toEqual({ ok: true, cleared: 2 });
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      list: { todos: [eggs], openCount: 1 },
+    });
+  });
+
+  it("leaves the Owner's other Lists unchanged", async () => {
+    const groceries = await createdList(ALICE, "Groceries");
+    const work = await createdList(ALICE, "Work");
+    const milk = await addedTodo(ALICE, groceries.id, "Milk");
+    const report = await addedTodo(ALICE, work.id, "Report");
+    await todos().setCompleted(ALICE, milk.id, true);
+    await todos().setCompleted(ALICE, report.id, true);
+
+    const result = await todos().clearCompleted(ALICE, groceries.id);
+
+    expect(result).toEqual({ ok: true, cleared: 1 });
+    expect(await todos().getList(ALICE, work.id)).toMatchObject({
+      list: { todos: [{ ...report, completed: true }], openCount: 0 },
+    });
+  });
+
+  it("removes nothing and returns 0 when no Todo is Completed", async () => {
+    const list = await createdList(ALICE, "Groceries");
+    const milk = await addedTodo(ALICE, list.id, "Milk");
+
+    const result = await todos().clearCompleted(ALICE, list.id);
+
+    expect(result).toEqual({ ok: true, cleared: 0 });
+    expect(await todos().getList(ALICE, list.id)).toMatchObject({
+      list: { todos: [milk] },
+    });
+  });
+
+  it("reports not found for an unknown List", async () => {
+    const result = await todos().clearCompleted(ALICE, crypto.randomUUID());
+
+    expect(result).toEqual({ ok: false, error: "not-found" });
+  });
+
+  it("reports not found for another Owner's List and leaves it unchanged", async () => {
+    const bobs = await createdList(BOB, "Bob's");
+    const milk = await addedTodo(BOB, bobs.id, "Milk");
+    await todos().setCompleted(BOB, milk.id, true);
+
+    const result = await todos().clearCompleted(ALICE, bobs.id);
+
+    expect(result).toEqual({ ok: false, error: "not-found" });
+    expect(await todos().getList(BOB, bobs.id)).toMatchObject({
+      list: { todos: [{ ...milk, completed: true }] },
+    });
+  });
+});
+
 async function addedTodo(ownerId: string, listId: string, title: string) {
   const result = await todos().addTodo(ownerId, listId, { title });
   if (!result.ok) throw new Error(result.error);

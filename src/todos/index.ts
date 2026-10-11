@@ -170,6 +170,27 @@ export function createTodos(db: Database) {
       await db.update(todos).set({ completed }).where(eq(todos.id, todoId));
       return { ok: true, todo: { ...todo, completed } };
     },
+
+    /**
+     * Clear Completed: permanently removes every Completed Todo in the
+     * Owner's List and returns how many it removed. An unknown or another
+     * Owner's List is reported as not found and left unchanged.
+     */
+    async clearCompleted(
+      ownerId: string,
+      listId: string,
+    ): Promise<
+      { ok: true; cleared: number } | { ok: false; error: "not-found" }
+    > {
+      if (!(await ownersList(ownerId, listId))) {
+        return { ok: false, error: "not-found" };
+      }
+      const cleared = await db
+        .delete(todos)
+        .where(and(eq(todos.listId, listId), eq(todos.completed, true)))
+        .returning({ id: todos.id });
+      return { ok: true, cleared: cleared.length };
+    },
   };
 }
 
