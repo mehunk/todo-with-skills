@@ -30,6 +30,13 @@ export const NotCompleted: Story = {};
 
 export const NotCompletedDark: Story = { parameters: dark };
 
+/** Completed: checkbox filled `primary`, title muted and struck through. */
+export const Completed: Story = {
+  args: { todo: { id: "1", title: "Buy oat milk", completed: true } },
+};
+
+export const CompletedDark: Story = { ...Completed, parameters: dark };
+
 /** Long titles wrap instead of being cut off. */
 export const LongTitle: Story = {
   args: {

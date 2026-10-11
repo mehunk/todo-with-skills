@@ -125,3 +125,79 @@ test("switching Lists shows only the selected List's Todos", async ({
   await expect(todoRows(page)).toHaveText(secondTodos);
   await expect(openCount(page)).toHaveText("2 open");
 });
+
+/** The checkbox of the Todo titled `title`, wherever it is shown. */
+const todoCheckbox = (page: Page, title: string) =>
+  page.getByRole("checkbox", { name: title, exact: true });
+
+/** The Completed section's rows, in the order shown. */
+const completedRows = (page: Page) =>
+  page
+    .getByRole("list", { name: "Completed", exact: true })
+    .getByRole("listitem");
+
+/** The "Completed (N)" toggle. */
+const completedToggle = (page: Page) =>
+  page.getByRole("button", { name: /^Completed \(\d+\)$/ });
+
+test("an Owner completes a Todo and reopens it, back in its place", async ({
+  page,
+  testData,
+}) => {
+  await openNewList(page, testData, "Complete");
+  const [milk, eggs, bread] = ["Milk", "Eggs", "Bread"].map((title) =>
+    testData.uniqueName(title),
+  );
+  for (const title of [milk, eggs, bread]) await addTodo(page, title);
+  await expect(todoRows(page)).toHaveText([milk, eggs, bread]);
+  // No Completed Todos: no Completed section.
+  await expect(completedToggle(page)).toBeHidden();
+
+  await todoCheckbox(page, eggs).check();
+  await expect(todoRows(page)).toHaveText([milk, bread]);
+  await expect(completedToggle(page)).toHaveText("Completed (1)");
+  await expect(completedRows(page)).toHaveText([eggs]);
+  await expect(todoCheckbox(page, eggs)).toBeChecked();
+  await expect(openCount(page)).toHaveText("2 open");
+
+  await page.reload();
+  await expect(todoRows(page)).toHaveText([milk, bread]);
+  await expect(completedRows(page)).toHaveText([eggs]);
+  await expect(openCount(page)).toHaveText("2 open");
+
+  await todoCheckbox(page, eggs).uncheck();
+  await expect(todoRows(page)).toHaveText([milk, eggs, bread]);
+  await expect(completedToggle(page)).toBeHidden();
+  await expect(openCount(page)).toHaveText("3 open");
+
+  await page.reload();
+  await expect(todoRows(page)).toHaveText([milk, eggs, bread]);
+  await expect(completedToggle(page)).toBeHidden();
+});
+
+test("the Completed section is expanded by default and collapses and expands", async ({
+  page,
+  testData,
+}) => {
+  await openNewList(page, testData, "Completed Section");
+  const [milk, eggs] = ["Milk", "Eggs"].map((title) =>
+    testData.uniqueName(title),
+  );
+  for (const title of [milk, eggs]) await addTodo(page, title);
+  await todoCheckbox(page, milk).check();
+  await todoCheckbox(page, eggs).check();
+
+  await expect(completedToggle(page)).toHaveText("Completed (2)");
+  await expect(completedToggle(page)).toHaveAttribute("aria-expanded", "true");
+  await expect(completedRows(page)).toHaveText([milk, eggs]);
+  await expect(openCount(page)).toHaveText("0 open");
+
+  await completedToggle(page).click();
+  await expect(completedToggle(page)).toHaveAttribute("aria-expanded", "false");
+  await expect(completedRows(page)).toHaveCount(0);
+  await expect(completedToggle(page)).toHaveText("Completed (2)");
+
+  await completedToggle(page).click();
+  await expect(completedToggle(page)).toHaveAttribute("aria-expanded", "true");
+  await expect(completedRows(page)).toHaveText([milk, eggs]);
+});

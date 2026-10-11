@@ -48,7 +48,11 @@ export function TodoRow({
       />
       <span
         id={titleId}
-        className={cn("text-sm", saving && "text-muted-foreground")}
+        className={cn(
+          "text-sm",
+          (saving || todo.completed) && "text-muted-foreground",
+          todo.completed && "line-through",
+        )}
       >
         {todo.title}
       </span>

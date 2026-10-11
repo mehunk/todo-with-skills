@@ -20,6 +20,7 @@ import {
   deleteTodo,
   fetchList,
   fetchLists,
+  setTodoCompleted,
 } from "./functions";
 import { listNameSchema, todoTitleSchema } from "./schemas";
 
@@ -299,5 +300,43 @@ export function useDeleteTodo(listId: string) {
       ...list,
       todos: list.todos.filter((todo) => todo.id !== todoId),
     }),
+  });
+}
+
+/** The List with the Todo `todoId` marked Completed or reopened. */
+const withCompleted = (
+  list: ListWithTodos,
+  todoId: string,
+  completed: boolean,
+): ListWithTodos => ({
+  ...list,
+  todos: list.todos.map((todo) =>
+    todo.id === todoId ? { ...todo, completed } : todo,
+  ),
+});
+
+/**
+ * Marks a Todo Completed or reopens it optimistically: it moves between the
+ * open Todos and the Completed section at once (the open count follows), and
+ * moves back with the "Couldn't save" toast if saving fails.
+ */
+export function useSetTodoCompleted(listId: string) {
+  return useListMutation({
+    listId,
+    mutationFn: async ({
+      todoId,
+      completed,
+    }: {
+      todoId: string;
+      completed: boolean;
+    }) => {
+      const result = await setTodoCompleted({ data: { todoId, completed } });
+      if (!result.ok) throw new Error(result.error);
+      return result.todo;
+    },
+    optimistic: (list, { todoId, completed }) =>
+      withCompleted(list, todoId, completed),
+    rollback: (list, { todoId, completed }) =>
+      withCompleted(list, todoId, !completed),
   });
 }
