@@ -14,7 +14,13 @@ import {
   openCount,
   type Todo,
 } from "#/todos";
-import { addTodo, createList, fetchList, fetchLists } from "./functions";
+import {
+  addTodo,
+  createList,
+  fetchList,
+  fetchLists,
+  setTodoCompleted,
+} from "./functions";
 import { listNameSchema, todoTitleSchema } from "./schemas";
 
 // TanStack Query wiring for Lists and Todos: query options shared by route
@@ -275,4 +281,42 @@ export function useAddTodoFromTitle(listId: string) {
   };
 
   return { add, error, clearError: () => setError(undefined) };
+}
+
+/** The List with the Todo `todoId` marked Completed or reopened. */
+const withCompleted = (
+  list: ListWithTodos,
+  todoId: string,
+  completed: boolean,
+): ListWithTodos => ({
+  ...list,
+  todos: list.todos.map((todo) =>
+    todo.id === todoId ? { ...todo, completed } : todo,
+  ),
+});
+
+/**
+ * Marks a Todo Completed or reopens it optimistically: it moves between the
+ * open Todos and the Completed section at once (the open count follows), and
+ * moves back with the "Couldn't save" toast if saving fails.
+ */
+export function useSetTodoCompleted(listId: string) {
+  return useListMutation({
+    listId,
+    mutationFn: async ({
+      todoId,
+      completed,
+    }: {
+      todoId: string;
+      completed: boolean;
+    }) => {
+      const result = await setTodoCompleted({ data: { todoId, completed } });
+      if (!result.ok) throw new Error(result.error);
+      return result.todo;
+    },
+    optimistic: (list, { todoId, completed }) =>
+      withCompleted(list, todoId, completed),
+    rollback: (list, { todoId, completed }) =>
+      withCompleted(list, todoId, !completed),
+  });
 }

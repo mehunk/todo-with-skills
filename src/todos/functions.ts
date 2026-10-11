@@ -52,3 +52,10 @@ export const addTodo = createServerFn({ method: "POST" })
     const { ownerId, todos } = await ownerTodos();
     return todos.addTodo(ownerId, data.listId, { title: data.title });
   });
+
+export const setTodoCompleted = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ todoId: z.string(), completed: z.boolean() }))
+  .handler(async ({ data }) => {
+    const { ownerId, todos } = await ownerTodos();
+    return todos.setCompleted(ownerId, data.todoId, data.completed);
+  });
